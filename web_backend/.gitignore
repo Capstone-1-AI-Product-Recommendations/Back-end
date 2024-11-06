@@ -8,6 +8,7 @@ myenv/
 .env
 
 # Django specific files
+.vscode/
 *.log
 *.pot
 *.pyc
@@ -21,7 +22,6 @@ db.sqlite3
 myenv/
 
 # Ignore IDE specific files
-.vscode/
 .idea/
 *.sublime-workspace
 *.sublime-project
