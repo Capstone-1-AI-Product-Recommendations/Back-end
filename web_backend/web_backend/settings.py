@@ -31,13 +31,22 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "rest_framework",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "web_backend"
+    "corsheaders",
+    "users",
+    "seller_dashboard",
+    "recommendations",
+    "products",
+    "payments",
+    "orders",
+    "admin_dashboard",
+
 ]
 
 MIDDLEWARE = [
@@ -77,10 +86,10 @@ WSGI_APPLICATION = "web_backend.wsgi.application"
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone_1', 
+        'NAME': 'Capstone1',
         'USER': 'root',
-        'PASSWORD': '12345',
-        'HOST': 'localhost', 
+        'PASSWORD': 'anhtu123',
+        'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
             'charset': 'utf8mb4',
