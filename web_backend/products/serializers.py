@@ -1,24 +1,22 @@
+# products/serializers.py
 from rest_framework import serializers
-from .models import Category, Comment, Product
+from .models import Product, Category, Comment
 
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = '__all__'
-
-class CommentSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
-    product = serializers.PrimaryKeyRelatedField(read_only=True)
-
-    class Meta:
-        model = Comment
-        fields = '__all__'
-
+# Serializer cho Product
 class ProductSerializer(serializers.ModelSerializer):
-    comments = CommentSerializer(many=True, read_only=True)
-    seller = serializers.PrimaryKeyRelatedField(read_only=True)
-    category = serializers.PrimaryKeyRelatedField(read_only=True)
-
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = ['product_id', 'name', 'description', 'price', 'category', 'is_featured', 'created_at', 'updated_at', 'seller']  # Sửa 'id' thành 'product_id'
+
+# Serializer cho Category
+class CategorySerializer(serializers.ModelSerializer):
+    products = ProductSerializer(many=True, read_only=True)  # Sử dụng ProductSerializer để lấy danh sách sản phẩm
+    class Meta:
+        model = Category
+        fields = ['category_id', 'category_name', 'description', 'products']  # Sửa 'id' thành 'category_id'
+
+# Serializer cho Comment
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['comment_id', 'user', 'product', 'comment', 'rating', 'created_at']  # Sửa 'id' thành 'comment_id' và thêm trường 'comment'

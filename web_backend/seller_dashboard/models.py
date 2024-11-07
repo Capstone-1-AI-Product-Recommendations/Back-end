@@ -27,7 +27,7 @@ class Ad(models.Model):
 
 class AdView(models.Model):
     ad_view_id = models.AutoField(primary_key=True)
-    ad = models.ForeignKey(Ad, models.DO_NOTHING)
+    ad = models.ForeignKey('Ad', models.DO_NOTHING)
     user = models.ForeignKey('users.User', models.DO_NOTHING)
     viewed_at = models.DateTimeField(blank=True, null=True)
 

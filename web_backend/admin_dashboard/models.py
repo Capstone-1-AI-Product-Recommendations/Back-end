@@ -15,7 +15,7 @@ class Notification(models.Model):
 
 class UserBrowsingBehavior(models.Model):
     behavior_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    user = models.ForeignKey('users.User', models.DO_NOTHING)
     product = models.ForeignKey('products.Product', models.DO_NOTHING)
     activity_type = models.CharField(max_length=50)
     interaction_value = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
