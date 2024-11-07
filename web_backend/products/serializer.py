@@ -1,7 +1,21 @@
 from rest_framework import serializers
-from .models import User
+from web_backend.models import Product, ProductAd, ProductRecommendation
 
-class UserSerializer(serializers.ModelSerializer):
+class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = '__all__'
+        model = ProductRecommendation
+        fields = ['user']  
+
+class ProductAdSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAd
+        fields = ['ad_title']  
+
+class ProductSerializer(serializers.ModelSerializer):
+    category = serializers.CharField(source='category.category_name', allow_null=True)
+    recommendations = ProductRecommendationSerializer(many=True, read_only=True)
+    ads = ProductAdSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = ['name', 'price', 'category', 'description', 'seller', 'quantity', 'recommendations', 'ads']

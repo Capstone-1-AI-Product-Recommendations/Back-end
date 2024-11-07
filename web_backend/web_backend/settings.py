@@ -55,7 +55,8 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google', 
     'social_django',
-    "web_backend"
+    "web_backend",
+    'corsheaders'
 
 ]
 
@@ -89,6 +90,7 @@ TEMPLATES = [
 ]
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 3600
 
 WSGI_APPLICATION = "web_backend.wsgi.application"
 
@@ -179,6 +181,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR,'app/static/images')
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [        
         'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication'
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
@@ -197,3 +200,8 @@ LOGIN_URL = 'login'
 LOGOUT_URL = 'logout'
 LOGIN_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',  
+    'http://127.0.0.1:8000/api/auth/registration/google/'
+]

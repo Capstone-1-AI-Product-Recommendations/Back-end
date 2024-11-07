@@ -126,6 +126,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    quantity = models.IntegerField(default=0) # thêm dòng này
 
     class Meta:
         managed = True
@@ -174,6 +175,10 @@ class User(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        if not self.role:
+            self.role = Role.objects.get_or_create(role_name="User")[0]
+        super().save(*args, **kwargs)
     class Meta:
         managed = True
         db_table = 'user'

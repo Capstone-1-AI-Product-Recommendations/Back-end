@@ -1,44 +1,36 @@
-from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import User
-from .serializer import UserSerializer
+from web_backend.models import Product, ProductAd, ProductRecommendation
 # Create your views here.
 
+
 @api_view(['GET'])
-def get_users(request):
-    users = User.objects.all()
-    serializer = UserSerializer(users,many = True)
-    return Response(serializer.data)
-
-@api_view(['POST'])
-def create_user(request):
-    serializer = UserSerializer(data = request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errorsr, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-def user_detail(request, pk):
+def product_detail(request, pk):
     try:
-        user = User.objects.get(pk=pk)
-    except User.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    
-    if request.method == 'GET':
-        serializer = UserSerializer(user)
-        return Response(serializer.data)
-    
-    elif request.method == 'PUT':
-        serializer = UserSerializer(user, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    elif request.method == 'DELETE':    
-        user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        product = Product.objects.get(pk=pk)
+    except Product.DoesNotExist:
+        return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+    recommendations = ProductRecommendation.objects.filter(product=product)
+    unique_recommendations = {rec.user.username: rec for rec in recommendations}.values()
+    recommendation_data = [{
+        "user": recommendation.user.username
+    } for recommendation in unique_recommendations]
+    ads = ProductAd.objects.filter(product=product)
+    unique_ads = {ad.product_ad_id: ad for ad in ads}.values()
+    ad_data = [{
+        "ad_title": ad.ad.title if ad.ad else "No Title"
+    } for ad in unique_ads]
+    product_data = {
+        "name": product.name,
+        "price": product.price,
+        "category": product.category.category_name if product.category else None,
+        "description": product.description,
+        "seller": product.seller.username if product.seller else None,
+        "quantity": product.quantity,
+        "recommendations": recommendation_data,
+        "ads": ad_data
+    }
+
+    return Response(product_data, status=status.HTTP_200_OK)
     
