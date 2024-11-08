@@ -1,5 +1,4 @@
 from rest_framework import serializers
-# from django.contrib.auth.models import User
 from web_backend.models import Role, User
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -18,5 +17,5 @@ class UserSerializer(serializers.ModelSerializer):
         return user
     
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)

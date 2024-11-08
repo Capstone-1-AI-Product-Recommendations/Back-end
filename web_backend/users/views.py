@@ -4,7 +4,9 @@ from rest_framework.response import Response
 from django.contrib.auth import authenticate, login, logout, get_user_model
 from .serializer import UserSerializer, LoginSerializer, RoleSerializer
 from web_backend.models import Role, User
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import User as DjangoUser
+from django.utils.crypto import get_random_string
 
 @api_view(['POST'])
 def register(request):
@@ -19,29 +21,28 @@ def register(request):
             if not user.role:
                 role_instance, created = Role.objects.get_or_create(role_name="User")
                 user.role = role_instance
-                user.password = make_password(user.password)
                 user.save() 
             return Response({"message": "User registered successfully", "user": serializer.data}, status=status.HTTP_201_CREATED)       
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  
 
 @api_view(['POST'])
 def login_view(request):    
-    serializer = LoginSerializer(data=request.data)
-    if serializer.is_valid():
-        username = serializer.validated_data['username']
-        password = serializer.validated_data['password']
-        print(f"Trying to authenticate user: {username}")
-        print(f"Trying to authenticate user: {password}")
-        user = authenticate(request, username = username, password = password)        
-        if user is not None:
-            print(f"User authenticated: {user}")
-            login(request, user)
-            return Response({"message": "Login successful"}, status=status.HTTP_200_OK)        
-        print("Authentication failed") 
-        return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
-    print(f"Invalid data: {serializer.errors}")
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'POST':
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            username = serializer.validated_data.get('username')
+            password = serializer.validated_data.get('password')
+            try:
+                user = User.objects.get(username=username)
+                if check_password(password, user.password):
+                    return Response({'message': 'Login successful',}, status=status.HTTP_200_OK)
+                else:
+                    return Response({"message": "Invalid password"}, status=status.HTTP_401_UNAUTHORIZED)
 
+            except User.DoesNotExist:
+                return Response({"message": "User does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 @api_view(['POST'])
 def logout_view(request):
     if request.user.is_authenticated:
@@ -50,27 +51,21 @@ def logout_view(request):
     return Response({"error": "User not authenticated"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-def GoogleLoginView(request):
+def GoogleSignUpView(request):
     user_data = request.data
-    user = get_user_model().objects.filter(email=user_data['email']).first()
-    if user:
-        return Response({"message": "Login successful", "user": user.username}, status=200)
-    return Response({"message": "User does not exist"}, status=400)
-
-@api_view(['POST'])
-def GoogleRegisterView(request):
-    user_data = request.data
-    user = get_user_model().objects.filter(email=user_data['email']).first()
+    email = user_data.get('email')
+    user = User.objects.filter(email=email).first()    
     if user:
         return Response({"message": "User already exists."}, status=200)
-    role_name = user_data.get('role', None)
-    user = get_user_model().objects.create_user(
-        username=user_data['username'],
-        email=user_data['email'],     
-        password='randompassword123',  
+    username = user_data.get('username', f"user_{get_random_string(length=8)}")
+    password = get_random_string(length=12) 
+    user = User.objects.create(
+        username=username,
+        email=email,
+        password=password,
     )
-    if role_name:
-        role, created = Role.objects.get_or_create(role_name=role_name)
-        user.role = role
-        user.save()
-    return Response({"message": "User registered successfully!"}, status=201)
+    role_name = user_data.get('role', 'User')
+    role, created = Role.objects.get_or_create(role_name=role_name)
+    user.role = role
+    user.save()
+    return Response({"message": "User registered successfully!", "username": user.username}, status=status.HTTP_201_CREATED)
