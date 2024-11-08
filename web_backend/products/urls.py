@@ -9,4 +9,11 @@ urlpatterns = [
     path('popular-categories/', views.get_popular_categories, name='popular_categories'),
     path('all-categories/', views.get_all_categories, name='all_categories'),
     path('latest-comments/', views.get_latest_comments, name='latest_comments'),
+
+    path('filter/category/', views.filter_by_category, name='filter_by_category'),
+    path('filter/price/', views.filter_by_price, name='filter_by_price'),
+    # path('filter/color/', views.filter_by_color, name='filter_by_color'),
+    # path('filter/brand/', views.filter_by_brand, name='filter_by_brand'),
+    # path('filter/stock-status/', views.filter_by_stock_status, name='filter_by_stock_status'),
+    path('filter/', views.filter_page, name='filter_page'),
 ]
