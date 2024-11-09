@@ -6,7 +6,12 @@
 #   * Remove `managed = True` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from django.core.exceptions import ValidationError
 
+def validate_file_size(file):
+    max_size = 10 * 1024 * 1024  # 10MB
+    if file.size > max_size:
+        raise ValidationError("File size exceeds the 10MB limit.")
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -126,7 +131,9 @@ class Product(models.Model):
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
-    quantity = models.IntegerField(default=0) # thêm dòng này
+    quantity = models.IntegerField(default=0) 
+    image = models.CharField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
+    video = models.CharField(max_length=255, blank=True, null=True)  # Lưu URL video
 
     class Meta:
         managed = True
