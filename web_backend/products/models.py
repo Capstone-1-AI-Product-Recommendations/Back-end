@@ -25,6 +25,16 @@ class Comment(models.Model):
         db_table = 'comment'
 
 class Product(models.Model):
+    IN_STOCK = 'in_stock'
+    OUT_OF_STOCK = 'out_of_stock'
+    ON_SALE = 'on_sale'
+
+    STOCK_STATUS_CHOICES = [
+        (IN_STOCK, 'In Stock'),
+        (OUT_OF_STOCK, 'Out of Stock'),
+        (ON_SALE, 'On Sale'),
+    ]
+
     product_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -35,6 +45,14 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
+    address = models.CharField(max_length=255)
+    color = models.CharField(max_length=50, blank=True, null=True)
+    brand = models.CharField(max_length=100, blank=True, null=True)
+    stock_status = models.CharField(
+        max_length=20,
+        choices=STOCK_STATUS_CHOICES,
+        default=IN_STOCK,
+    )
     class Meta:
         managed = False
         db_table = 'product'
