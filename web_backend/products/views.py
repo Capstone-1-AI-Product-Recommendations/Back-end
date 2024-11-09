@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Product, ProductAd, ProductRecommendation
 from .serializer import CRUDProductSerializer
+from web_backend.file_uploads import validate_file_size, upload_to_cloudinary
 
 
 @api_view(['GET'])
@@ -28,6 +29,8 @@ def product_detail(request, pk):
         "description": product.description,
         "seller": product.seller.username if product.seller else None,
         "quantity": product.quantity,
+        "image_url": product.image_url,   
+        "video_url": product.video_url,
         "recommendations": recommendation_data,
         "ads": ad_data
     }
@@ -47,6 +50,15 @@ def product_crud(request, pk=None):
 
     if request.method == 'POST':
         product_data = request.data
+        image_url = product_data.get('image_url')
+        video_url = product_data.get('video_url')
+        # Kiểm tra và tải ảnh lên Cloudinary từ URL nếu có
+        if image_url:
+            try:
+                uploaded_image_url = upload_to_cloudinary(image_url)
+                product_data['image_url'] = uploaded_image_url  # Lưu URL ảnh sau khi tải lên Cloudinary
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         if Product.objects.filter(name=product_data.get('name')).exists():
             return Response({"error": "Product already exists."}, status=status.HTTP_400_BAD_REQUEST)
 

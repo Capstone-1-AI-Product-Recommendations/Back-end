@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google', 
     'social_django',
     "web_backend",
-    'corsheaders'
+    'corsheaders',
     'cloudinary',
     'cloudinary_storage',
 ]
@@ -115,11 +115,13 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Cấu hình Cloudinary
 CLOUDINARY = {
-    'CLOUD_NAME': 'chinh',
+    'CLOUD_NAME': 'dkleeailh',
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
-
+# CLOUD_NAME = 'dkleeailh'
+# API_KEY = '171326873511271'
+# API_SECRET = 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 
 # REST_USE_JWT = True
 # Database

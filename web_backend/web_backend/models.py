@@ -132,8 +132,8 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField(default=0) 
-    image = models.CharField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
-    video = models.CharField(max_length=255, blank=True, null=True)  # Lưu URL video
+    image_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
+    video_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL video
 
     class Meta:
         managed = True
