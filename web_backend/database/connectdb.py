@@ -48,6 +48,9 @@ try:
 
     # Bảng product_recommendation
     mycursor.execute("INSERT INTO product_recommendation (user_id, session_id, product_id, category_id) VALUES (1, 'session_123', 1, 1), (2, 'session_456', 2, 2);")
+    
+    # Bảng user_bank_account
+    mycursor.execute("INSERT INTO user_bank_account (user_id, bank_name, account_number, account_holder_name, account_type) VALUES (1, 'Vietcombank', 123456789012345, 'john', 'Thanh toán'), (2, 'Techcombank', 987654321098765, 'jane_doe', 'Thanh toán');")
 
     # Xác nhận tất cả thay đổi vào cơ sở dữ liệu
     db.commit()

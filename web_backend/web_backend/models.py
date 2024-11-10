@@ -191,6 +191,17 @@ class User(models.Model):
         managed = True
         db_table = 'user'
 
+class UserBankAccount(models.Model):
+    bank_account_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Liên kết với bảng User
+    bank_name = models.CharField(max_length=100)  # Tên ngân hàng
+    account_number = models.CharField(max_length=20)  # Số tài khoản ngân hàng
+    account_holder_name = models.CharField(max_length=100)  # Chủ tài khoản
+    account_type = models.CharField(max_length=50, blank=True, null=True)  # Loại tài khoản (Thanh toán, Tiết kiệm, ...)
+
+    class Meta:
+        managed = True
+        db_table = 'user_bank_account'
 
 class UserBrowsingBehavior(models.Model):
     behavior_id = models.AutoField(primary_key=True)
