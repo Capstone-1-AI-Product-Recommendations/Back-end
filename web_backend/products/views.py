@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Product, ProductAd, ProductRecommendation
+from web_backend.models import Product, ProductAd, ProductRecommendation, Comment
 from .serializer import CRUDProductSerializer
 from web_backend.file_uploads import validate_file_size, upload_to_cloudinary
 
@@ -26,6 +26,15 @@ def product_detail(request, pk):
     ad_data = [{
         "ad_title": ad.ad.title if ad.ad else "No Title"
     } for ad in unique_ads]
+    # Lấy danh sách các comment liên quan đến sản phẩm
+    comments = Comment.objects.filter(product=product)
+    unique_comments = {comment.comment_id: comment for comment in comments}.values()
+    comment_data = [{
+        "user": comment.user.username,
+        "comment": comment.comment,
+        "rating": comment.rating,
+        "created_at": comment.created_at
+    } for comment in unique_comments]
     # Tạo dữ liệu sản phẩm
     product_data = {
         "name": product.name,
@@ -34,11 +43,11 @@ def product_detail(request, pk):
         "description": product.description,
         "seller": product.seller.username if product.seller else None,
         "quantity": product.quantity,
-        "reviews": product.reviews,
         "image_url": product.image_url,   
         "video_url": product.video_url,
         "recommendations": recommendation_data,
-        "ads": ad_data
+        "ads": ad_data,
+        "comments": comment_data
     }
 
     return Response(product_data, status=status.HTTP_200_OK)

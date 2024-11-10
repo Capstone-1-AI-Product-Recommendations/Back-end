@@ -134,7 +134,6 @@ class Product(models.Model):
     quantity = models.IntegerField(default=0) 
     image_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
     video_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL video
-    reviews = models.TextField(blank=True, null=True)
     
     class Meta:
         managed = True

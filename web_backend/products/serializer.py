@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from web_backend.models import Product, ProductAd, ProductRecommendation
+from web_backend.models import Product, ProductAd, ProductRecommendation, Comment
 
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['user', 'comment', 'rating', 'created_at']
 class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
@@ -18,7 +23,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['name', 'price', 'category', 'description', 'seller', 'image_url', 'video_url' 'quantity', 'recommendations', 'ads', 'reviews']
+        fields = ['name', 'price', 'category', 'description', 'seller', 'image_url', 'video_url' 'quantity', 'recommendations', 'ads', 'comments']
 
 class CRUDProductSerializer(serializers.ModelSerializer):
     class Meta:
