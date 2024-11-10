@@ -4,7 +4,7 @@ from web_backend.models import Product, ProductAd, ProductRecommendation
 class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
-        fields = ['user']  
+        fields = ['user', 'description']  
 
 class ProductAdSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,7 +18,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ['name', 'price', 'category', 'description', 'seller', 'image_url', 'video_url' 'quantity', 'recommendations', 'ads']
+        fields = ['name', 'price', 'category', 'description', 'seller', 'image_url', 'video_url' 'quantity', 'recommendations', 'ads', 'reviews']
 
 class CRUDProductSerializer(serializers.ModelSerializer):
     class Meta:

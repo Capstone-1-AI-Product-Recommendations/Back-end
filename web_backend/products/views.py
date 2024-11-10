@@ -12,16 +12,21 @@ def product_detail(request, pk):
         product = Product.objects.get(pk=pk)
     except Product.DoesNotExist:
         return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+    # Lấy danh sách các đề xuất sản phẩm
     recommendations = ProductRecommendation.objects.filter(product=product)
     unique_recommendations = {rec.user.username: rec for rec in recommendations}.values()
+     # Tạo dữ liệu đề xuất với trường description từ ProductRecommendation
     recommendation_data = [{
-        "user": recommendation.user.username
+        "user": recommendation.user.username,
+        "description": recommendation.description
     } for recommendation in unique_recommendations]
+    # Lấy danh sách các quảng cáo (ads) liên quan đến sản phẩm
     ads = ProductAd.objects.filter(product=product)
     unique_ads = {ad.product_ad_id: ad for ad in ads}.values()
     ad_data = [{
         "ad_title": ad.ad.title if ad.ad else "No Title"
     } for ad in unique_ads]
+    # Tạo dữ liệu sản phẩm
     product_data = {
         "name": product.name,
         "price": product.price,
@@ -29,6 +34,7 @@ def product_detail(request, pk):
         "description": product.description,
         "seller": product.seller.username if product.seller else None,
         "quantity": product.quantity,
+        "reviews": product.reviews,
         "image_url": product.image_url,   
         "video_url": product.video_url,
         "recommendations": recommendation_data,
@@ -59,9 +65,10 @@ def product_crud(request, pk=None):
                 product_data['image_url'] = uploaded_image_url  # Lưu URL ảnh sau khi tải lên Cloudinary
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # Kiểm tra nếu sản phẩm đã tồn tại
         if Product.objects.filter(name=product_data.get('name')).exists():
             return Response({"error": "Product already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
+        # Lưu sản phẩm mới
         serializer = CRUDProductSerializer(data=product_data)
         if serializer.is_valid():
             serializer.save()
@@ -73,7 +80,7 @@ def product_crud(request, pk=None):
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
             return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-
+        # Cập nhật sản phẩm
         serializer = CRUDProductSerializer(product, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -85,9 +92,9 @@ def product_crud(request, pk=None):
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
             return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-        
+        # Xóa sản phẩm
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
     return Response({"error": "Method not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
     

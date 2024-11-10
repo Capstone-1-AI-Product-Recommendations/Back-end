@@ -134,7 +134,8 @@ class Product(models.Model):
     quantity = models.IntegerField(default=0) 
     image_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
     video_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL video
-
+    reviews = models.TextField(blank=True, null=True)
+    
     class Meta:
         managed = True
         db_table = 'product'
@@ -157,7 +158,8 @@ class ProductRecommendation(models.Model):
     product = models.ForeignKey(Product, models.DO_NOTHING)
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     recommended_at = models.DateTimeField(blank=True, null=True)
-
+    description = models.TextField(blank=True, null=True)
+    
     class Meta:
         managed = True
         db_table = 'product_recommendation'
