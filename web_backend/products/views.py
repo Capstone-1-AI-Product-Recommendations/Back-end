@@ -6,21 +6,34 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db.models import Count, Q
 import requests
+import random
 
-# API để lấy sản phẩm nổi bật
+# API để lấy 6 sản phẩm nổi bật
 @api_view(['GET'])
 def get_featured_products(request):
-    featured_products = Product.objects.filter(is_featured=True)
+    featured_products = Product.objects.filter(is_featured=True)[:6]
     serialized_data = ProductSerializer(featured_products, many=True).data
     return Response(serialized_data)
 
-# API để lấy sản phẩm phổ biến
+# API để lấy 8 sản phẩm phổ biến
 @api_view(['GET'])
 def get_trending_products(request):
     trending_products = Product.objects.annotate(
         total_views=Count('userbrowsingbehavior__product')
-    ).order_by('-total_views')[:5]
+    ).order_by('-total_views')[:8]
     serialized_data = ProductSerializer(trending_products, many=True).data
+    return Response(serialized_data)
+
+# API để lấy 28 sản phẩm ngẫu nhiên
+@api_view(['GET'])
+def get_random_products(request):
+    product_count = Product.objects.count()
+    random_ids = random.sample(
+        list(Product.objects.values_list('product_id', flat=True)),
+        min(28, product_count)
+    )
+    random_products = Product.objects.filter(product_id__in=random_ids)
+    serialized_data = ProductSerializer(random_products, many=True).data
     return Response(serialized_data)
 
 # API để lấy danh mục phổ biến
@@ -51,6 +64,7 @@ def get_latest_comments(request):
 def homepage_api(request):
     featured_products = requests.get('http://localhost:8000/products/featured/').json()
     trending_products = requests.get('http://localhost:8000/products/trending/').json()
+    random_products = requests.get('http://localhost:8000/products/random/').json()
     recommended_products = requests.get('http://localhost:8000/recommendations/recommended/').json() if request.user.is_authenticated else []
     popular_categories = requests.get('http://localhost:8000/products/popular-categories/').json()
     latest_comments = requests.get('http://localhost:8000/products/latest-comments/').json()
@@ -60,6 +74,7 @@ def homepage_api(request):
     data = {
         'featured_products': featured_products,
         'trending_products': trending_products,
+        'random_products': random_products,
         'recommended_products': recommended_products,
         'popular_categories': popular_categories,
         'latest_comments': latest_comments,
