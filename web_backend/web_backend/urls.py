@@ -19,9 +19,11 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-   # path("admin/", admin.site.urls),
+    # path("admin/", admin.site.urls),
     path('products/', include('products.urls')),
-    path('seller_dashboard/', include('seller_dashboard.urls')),
     path('recommendations/', include('recommendations.urls')),
-    path('products/', include('products.urls')),
+
+    path('seller_dashboard/', include('seller_dashboard.urls')), #URL cho seller
+    path('admin_dashboard/', include('admin_dashboard.urls')),  #URL cho admin
+    path('users/', include('users.urls')),  #URL cho phân quyền người dùng
 ]
