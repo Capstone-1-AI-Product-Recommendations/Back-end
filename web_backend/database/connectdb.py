@@ -17,7 +17,7 @@ try:
     mycursor.execute("INSERT INTO product (name, description, price, seller_id, category_id) VALUES ('Laptop', 'Máy tính xách tay', 1500.00, 1, 1), ('Smartphone', 'Điện thoại thông minh', 800.00, 2, 1);")
 
     # Bảng order
-    mycursor.execute("INSERT INTO `order` (user_id, total, status) VALUES (1, 2300.00, 'completed'), (2, 800.00, 'pending');")
+    mycursor.execute("INSERT INTO `order` (user_id, total, status) VALUES (1, 2300.00, 'PENDING'), (2, 800.00, 'PENDING');")
 
     # Bảng order_item
     mycursor.execute("INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (1, 1, 1, 1500.00), (2, 2, 1, 800.00);")
