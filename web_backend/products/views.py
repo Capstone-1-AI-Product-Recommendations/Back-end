@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from django.db.models import Count, Q
 import requests
 import random
+from django.urls import reverse
+
 
 # API để lấy 6 sản phẩm nổi bật
 @api_view(['GET'])
@@ -62,14 +64,19 @@ def get_latest_comments(request):
 # Tổng hợp API cho trang chủ
 @api_view(['GET'])
 def homepage_api(request):
-    featured_products = requests.get('http://localhost:8000/products/featured/').json()
-    trending_products = requests.get('http://localhost:8000/products/trending/').json()
-    random_products = requests.get('http://localhost:8000/products/random/').json()
-    recommended_products = requests.get('http://localhost:8000/recommendations/recommended/').json() if request.user.is_authenticated else []
-    popular_categories = requests.get('http://localhost:8000/products/popular-categories/').json()
-    latest_comments = requests.get('http://localhost:8000/products/latest-comments/').json()
-    ads = requests.get('http://localhost:8000/seller_dashboard/ads/').json()
-    all_categories = requests.get('http://localhost:8000/products/all-categories/').json()
+    base_url = request.build_absolute_uri('/')[:-1]  # Get the base URL dynamically
+
+    featured_products = requests.get(base_url + reverse('featured_products')).json()
+    trending_products = requests.get(base_url + reverse('trending_products')).json()
+    random_products = requests.get(base_url + reverse('random_products')).json()
+    recommended_products = (
+        requests.get(base_url + reverse('recommendations:recommended')).json()
+        if request.user.is_authenticated else []
+    )
+    popular_categories = requests.get(base_url + reverse('popular_categories')).json()
+    latest_comments = requests.get(base_url + reverse('latest_comments')).json()
+    ads = requests.get(base_url + reverse('seller_dashboard:ads')).json()
+    all_categories = requests.get(base_url + reverse('all_categories')).json()
 
     data = {
         'featured_products': featured_products,
