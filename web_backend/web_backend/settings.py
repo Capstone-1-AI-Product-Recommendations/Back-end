@@ -118,9 +118,9 @@ SOCIALACCOUNT_PROVIDERS = {
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'web_backend', 
+        'NAME': 'capstone_1',
         'USER': 'root',
-        'PASSWORD': 'nhc171103',
+        'PASSWORD': '12345',
         'HOST': 'localhost', 
         'PORT': '3306', 
         'OPTIONS': {
