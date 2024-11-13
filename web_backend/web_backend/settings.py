@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "users",
+    'carts',
     'products',
     'admin_dashboard',
     'orders',
@@ -56,8 +57,9 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google', 
     'social_django',
     "web_backend",
-    'corsheaders'
-
+    'corsheaders',
+    'cloudinary',
+    'cloudinary_storage',
 ]
 
 MIDDLEWARE = [
@@ -68,7 +70,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'allauth.account.middleware.AccountMiddleware'
+    'allauth.account.middleware.AccountMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = "web_backend.urls"
@@ -110,6 +113,16 @@ SOCIALACCOUNT_PROVIDERS = {
         
     }
 }
+
+# Cấu hình Cloudinary
+CLOUDINARY = {
+    'CLOUD_NAME': 'dkleeailh',
+    'API_KEY': '171326873511271',
+    'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
+}
+# CLOUD_NAME = 'dkleeailh'
+# API_KEY = '171326873511271'
+# API_SECRET = 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 
 # REST_USE_JWT = True
 # Database
@@ -171,12 +184,16 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR,'static')
 ]
-MEDIA_URL = '/images/'
+MEDIA_URL = '/media/'
 
-MEDIA_ROOT = os.path.join(BASE_DIR,'app/static/images')
+MEDIA_ROOT = os.path.join(BASE_DIR,'media')
+
+# Giới hạn kích thước tệp (10MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [        
@@ -185,6 +202,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
+        # 'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
@@ -205,3 +223,9 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',  
     'http://127.0.0.1:8000/api/auth/registration/google/'
 ]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ORIGIN_WHITELIST = [
+    'http://localhost:8000',  
+]
+

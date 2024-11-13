@@ -17,7 +17,7 @@ try:
     mycursor.execute("INSERT INTO product (name, description, price, seller_id, category_id) VALUES ('Laptop', 'Máy tính xách tay', 1500.00, 1, 1), ('Smartphone', 'Điện thoại thông minh', 800.00, 2, 1);")
 
     # Bảng order
-    mycursor.execute("INSERT INTO `order` (user_id, total, status) VALUES (1, 2300.00, 'completed'), (2, 800.00, 'pending');")
+    mycursor.execute("INSERT INTO `order` (user_id, total, status) VALUES (1, 2300.00, 'PENDING'), (2, 800.00, 'PENDING');")
 
     # Bảng order_item
     mycursor.execute("INSERT INTO order_item (order_id, product_id, quantity, price) VALUES (1, 1, 1, 1500.00), (2, 2, 1, 800.00);")
@@ -48,6 +48,9 @@ try:
 
     # Bảng product_recommendation
     mycursor.execute("INSERT INTO product_recommendation (user_id, session_id, product_id, category_id) VALUES (1, 'session_123', 1, 1), (2, 'session_456', 2, 2);")
+    
+    # Bảng user_bank_account
+    mycursor.execute("INSERT INTO user_bank_account (user_id, bank_name, account_number, account_holder_name, account_type) VALUES (1, 'Vietcombank', 123456789012345, 'john', 'Thanh toán'), (2, 'Techcombank', 987654321098765, 'jane_doe', 'Thanh toán');")
 
     # Xác nhận tất cả thay đổi vào cơ sở dữ liệu
     db.commit()
