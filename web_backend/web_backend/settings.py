@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     "payments",
     "orders",
     "admin_dashboard",
-
 ]
 
 MIDDLEWARE = [
@@ -57,7 +56,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+     'corsheaders.middleware.CorsMiddleware',
 ]
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = "web_backend.urls"
 
@@ -86,9 +87,9 @@ WSGI_APPLICATION = "web_backend.wsgi.application"
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Capstone1',
+        'NAME': 'capstone1',
         'USER': 'root',
-        'PASSWORD': 'anhtu123',
+        'PASSWORD': '12345',
         'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {

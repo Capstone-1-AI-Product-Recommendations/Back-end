@@ -8,6 +8,8 @@ from django.db.models import Count, Q
 import requests
 import random
 
+# BASE_URL = 'http://localhost:8000'
+
 # API để lấy 6 sản phẩm nổi bật
 @api_view(['GET'])
 def get_featured_products(request):
@@ -34,6 +36,7 @@ def get_random_products(request):
     )
     random_products = Product.objects.filter(product_id__in=random_ids)
     serialized_data = ProductSerializer(random_products, many=True).data
+    print(serialized_data)
     return Response(serialized_data)
 
 # API để lấy danh mục phổ biến
@@ -62,14 +65,15 @@ def get_latest_comments(request):
 # Tổng hợp API cho trang chủ
 @api_view(['GET'])
 def homepage_api(request):
-    featured_products = requests.get('http://localhost:8000/products/featured/').json()
-    trending_products = requests.get('http://localhost:8000/products/trending/').json()
-    random_products = requests.get('http://localhost:8000/products/random/').json()
-    recommended_products = requests.get('http://localhost:8000/recommendations/recommended/').json() if request.user.is_authenticated else []
-    popular_categories = requests.get('http://localhost:8000/products/popular-categories/').json()
-    latest_comments = requests.get('http://localhost:8000/products/latest-comments/').json()
-    ads = requests.get('http://localhost:8000/seller_dashboard/ads/').json()
-    all_categories = requests.get('http://localhost:8000/products/all-categories/').json()
+    BASE_URL = request.build_absolute_uri('/')[:-1]    
+    featured_products = requests.get(f'{BASE_URL}/products/featured/').json()
+    trending_products = requests.get(f'{BASE_URL}/products/trending/').json()
+    random_products = requests.get(f'{BASE_URL}/products/random/').json()
+    recommended_products = requests.get(f'{BASE_URL}/recommendations/recommended/').json() if request.user.is_authenticated else []
+    popular_categories = requests.get(f'{BASE_URL}/products/popular-categories/').json()
+    latest_comments = requests.get(f'{BASE_URL}/products/latest-comments/').json()
+    ads = requests.get(f'{BASE_URL}/seller_dashboard/ads/').json()
+    all_categories = requests.get(f'{BASE_URL}/products/all-categories/').json()
 
     data = {
         'featured_products': featured_products,
