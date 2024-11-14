@@ -97,6 +97,11 @@ SESSION_COOKIE_AGE = 3600
 
 WSGI_APPLICATION = "web_backend.wsgi.application"
 
+GOOGLE_CLIENT_ID = '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com'
+GOOGLE_CLIENT_SECRET = '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'
+GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/api/auth/callback/'
+
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": [
@@ -106,8 +111,8 @@ SOCIALACCOUNT_PROVIDERS = {
         "AUTH_PARAMS": {"access_type": "online"},
         "OAUTH_PKCE_ENABLED": True,
         "APP": {
-            'client_id' : '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com',
-            'secret' : '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',
+            'client_id' : GOOGLE_CLIENT_ID,
+            'secret' : GOOGLE_CLIENT_SECRET,
             'key' : ''
         }
         
@@ -211,7 +216,7 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.Emailbackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.Emailbackend'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 LOGIN_URL = 'login'
