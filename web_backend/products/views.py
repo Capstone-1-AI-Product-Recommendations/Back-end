@@ -64,7 +64,7 @@ def get_latest_comments(request):
 # Tổng hợp API cho trang chủ
 @api_view(['GET'])
 def homepage_api(request):
-    base_url = request.build_absolute_uri('/')[:-1]  # Get the base URL dynamically
+    base_url = request.build_absolute_uri('/')[:-1]  # Lấy url cơ sở chủ động
 
     featured_products = requests.get(base_url + reverse('featured_products')).json()
     trending_products = requests.get(base_url + reverse('trending_products')).json()
