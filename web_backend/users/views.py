@@ -9,8 +9,11 @@ from django.utils.crypto import get_random_string
 import jwt, requests
 from django.utils.http import urlencode
 from django.conf import settings
+from django.core.mail import send_mail
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import redirect
 
-
+@csrf_exempt
 @api_view(['POST'])
 def register(request):
     if request.method == 'POST':    
@@ -137,3 +140,61 @@ def GoogleAuthCallback(request):
         return Response({
             "message": "User signed up successfully via Google."
         }, status=status.HTTP_201_CREATED)
+        
+@api_view(['POST'])
+def reset_password(request):
+    """
+    Đặt lại mật khẩu nếu người dùng cung cấp đúng thông tin.
+    """
+    email = request.data.get('email')  # Email người dùng nhập
+    username = request.data.get('username')  # Username người dùng nhập
+    old_password = request.data.get('old_password')  # Mật khẩu cũ
+    new_password = request.data.get('new_password')  # Mật khẩu mới
+
+    if not all([email, username, old_password, new_password]):
+        return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email, username=username)
+        if check_password(old_password, user.password):
+            user.password = make_password(new_password)  # Mã hóa mật khẩu
+            user.save()
+            return Response({"message": "Password reset successfully."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Old password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+    except User.DoesNotExist:
+        return Response({"error": "User not found with the provided email and username."}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+def forgot_password(request):
+    """
+    Gửi mật khẩu mới đến email mà người dùng cung cấp.
+    """
+    email = request.data.get('email')  # Lấy email từ yêu cầu
+
+    if not email:
+        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email)
+        new_password = get_random_string(8)  # Tạo mật khẩu ngẫu nhiên
+        user.password = make_password(new_password)
+        user.save()
+
+        # Gửi mật khẩu qua email
+        send_mail(
+            subject="Your New Password",
+            message=f"Hi {user.username}, your new password is: {new_password}",
+            from_email="your_email@example.com",
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        
+        # Chuyển hướng đến trang login sau khi gửi email thành công
+        return redirect('http://127.0.0.1:8000/api/login/') 
+
+    except User.DoesNotExist:
+        return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

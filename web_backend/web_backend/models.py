@@ -7,11 +7,18 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.core.exceptions import ValidationError
+import re
 
 def validate_file_size(file):
     max_size = 10 * 1024 * 1024  # 10MB
     if file.size > max_size:
         raise ValidationError("File size exceeds the 10MB limit.")
+    
+def validate_email_format(value):
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, value):
+        raise ValidationError("Invalid email format.")
+
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -200,6 +207,8 @@ class User(models.Model):
     email = models.CharField(unique=True, max_length=100)
     full_name = models.CharField(max_length=100, blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
+    reset_token = models.CharField(max_length=50, blank=True, null=True)  # Mã token reset mật khẩu
+    reset_token_expiry = models.DateTimeField(blank=True, null=True)  # Thời gian hết hạn của token
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 

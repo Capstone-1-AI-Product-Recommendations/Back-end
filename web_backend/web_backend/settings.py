@@ -216,8 +216,8 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.Emailbackend'
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 LOGIN_URL = 'login'
 LOGOUT_URL = 'logout'
@@ -234,3 +234,9 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:8000',  
 ]
 
+EMAIL_HOST = 'smtp.gmail.com'  # Máy chủ SMTP của Gmail
+EMAIL_PORT = 587  # Cổng SMTP cho Gmail
+EMAIL_USE_TLS = True  # Sử dụng TLS
+EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
+EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
+DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
