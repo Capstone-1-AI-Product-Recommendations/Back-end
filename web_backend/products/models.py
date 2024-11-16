@@ -53,6 +53,8 @@ class Product(models.Model):
         choices=STOCK_STATUS_CHOICES,
         default=IN_STOCK,
     )
+    discount = models.IntegerField(default=0)
+    rating = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     class Meta:
         managed = False
         db_table = 'product'

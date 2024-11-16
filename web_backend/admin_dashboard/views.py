@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import JsonResponse
 from rest_framework import status
+from django.db.models import Q
 from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
 from users.models import User
@@ -66,3 +67,23 @@ def delete_user(request, user_id):
         return Response({'message': 'User deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API để tìm kiếm người dùng dựa trên username, email hoặc role.
+@api_view(['GET'])
+@admin_required
+def search_users(request):
+    query = request.query_params.get('query', '').strip()
+    if not query:
+        return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    users = User.objects.filter(
+        Q(username__icontains=query) |  # Tìm kiếm theo username
+        Q(email__icontains=query) |    # Tìm kiếm theo email
+        Q(role__role_name__icontains=query)  # Tìm kiếm theo tên vai trò
+    ).distinct()
+
+    if users.exists():
+        serialized_data = UserSerializer(users, many=True).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    else:
+        return Response({'message': 'No users found matching the query'}, status=status.HTTP_404_NOT_FOUND)
