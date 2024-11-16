@@ -8,11 +8,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 import re
-
-def validate_file_size(file):
-    max_size = 10 * 1024 * 1024  # 10MB
-    if file.size > max_size:
-        raise ValidationError("File size exceeds the 10MB limit.")
     
 def validate_email_format(value):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'

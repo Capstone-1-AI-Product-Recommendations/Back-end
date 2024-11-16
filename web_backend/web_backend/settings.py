@@ -125,6 +125,7 @@ CLOUDINARY = {
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 # CLOUD_NAME = 'dkleeailh'
 # API_KEY = '171326873511271'
 # API_SECRET = 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
@@ -197,9 +198,6 @@ MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
 
-# Giới hạn kích thước tệp (10MB)
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [        
         'rest_framework.authentication.SessionAuthentication',
@@ -208,6 +206,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
         # 'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
     ],
 }
 
@@ -231,7 +233,7 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = [
-    'http://localhost:8000',  
+    'http://127.0.0.1:8000',  
 ]
 
 EMAIL_HOST = 'smtp.gmail.com'  # Máy chủ SMTP của Gmail
@@ -240,3 +242,4 @@ EMAIL_USE_TLS = True  # Sử dụng TLS
 EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
+

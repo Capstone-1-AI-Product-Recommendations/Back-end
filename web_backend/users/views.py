@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.contrib.auth import authenticate, login, logout, get_user_model
+from django.contrib.auth import logout
 from .serializer import UserSerializer, LoginSerializer, RoleSerializer
 from web_backend.models import Role, User
 from django.contrib.auth.hashers import make_password, check_password
@@ -13,23 +13,57 @@ from django.core.mail import send_mail
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import redirect
 
+
 @csrf_exempt
 @api_view(['POST'])
 def register(request):
-    if request.method == 'POST':    
-        serializer = UserSerializer(data=request.data) # Khởi tạo serializer với dữ liệu yêu cầu        
+    if request.method == 'POST':
+        serializer = UserSerializer(data=request.data)  # Khởi tạo serializer với dữ liệu yêu cầu        
         if serializer.is_valid():
-            password = serializer.validated_data.get('password')  # Lấy mật khẩu từ dữ liệu đã xác thực
+            # Xử lý mật khẩu
+            password = serializer.validated_data.get('password')
             if password:
                 hashed_password = make_password(password)
-                serializer.validated_data['password'] = hashed_password # Cập nhật mật khẩu đã mã hóa vào dữ liệu
+                serializer.validated_data['password'] = hashed_password            
+            # Tạo người dùng
             user = User.objects.create(**serializer.validated_data)
             if not user.role:
-                role_instance, created = Role.objects.get_or_create(role_name="User") # Tạo vai trò 'User' nếu chưa tồn tại
-                user.role = role_instance # Gán vai trò cho người dùng
-                user.save() 
-            return Response({"message": "User registered successfully", "user": serializer.data}, status=status.HTTP_201_CREATED)       
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)  
+                role_instance, created = Role.objects.get_or_create(role_name="User")  # Tạo vai trò 'User' nếu chưa tồn tại
+                user.role = role_instance
+                user.save()
+            # Tạo mã xác thực ngẫu nhiên
+            verification_token = get_random_string(32)
+            user.reset_token = verification_token  # Lưu mã xác thực trong trường reset_token
+            user.save()
+            # Gửi email xác thực
+            verification_link = f"http://127.0.0.1:8000/api/verify_email/?token={verification_token}"
+            send_mail(
+                subject="Verify Your Email",
+                message=f"Hi {user.username},\n\nPlease verify your email by clicking the link below:\n{verification_link}\n\nThank you!",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            return Response(
+                {"message": "User registered successfully. A verification email has been sent to your email address."},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+   
+@csrf_exempt 
+@api_view(['GET'])
+def verify_email(request):
+    token = request.GET.get('token')  # Lấy token từ query parameters
+    if not token:
+        return Response({"error": "Verification token is required."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        # Tìm người dùng dựa trên token
+        user = User.objects.get(reset_token=token)
+        user.reset_token = None  # Xóa mã xác thực sau khi sử dụng
+        user.save()
+        return redirect('http://127.0.0.1:8000/api/login/')  # Chuyển hướng đến trang đăng nhập
+    except User.DoesNotExist:
+        return Response({"error": "Invalid verification token."}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['POST'])
 def login_view(request):    
@@ -143,17 +177,12 @@ def GoogleAuthCallback(request):
         
 @api_view(['POST'])
 def reset_password(request):
-    """
-    Đặt lại mật khẩu nếu người dùng cung cấp đúng thông tin.
-    """
     email = request.data.get('email')  # Email người dùng nhập
     username = request.data.get('username')  # Username người dùng nhập
     old_password = request.data.get('old_password')  # Mật khẩu cũ
     new_password = request.data.get('new_password')  # Mật khẩu mới
-
     if not all([email, username, old_password, new_password]):
         return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
-
     try:
         user = User.objects.get(email=email, username=username)
         if check_password(old_password, user.password):
@@ -167,20 +196,14 @@ def reset_password(request):
 
 @api_view(['POST'])
 def forgot_password(request):
-    """
-    Gửi mật khẩu mới đến email mà người dùng cung cấp.
-    """
     email = request.data.get('email')  # Lấy email từ yêu cầu
-
     if not email:
         return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-
     try:
         user = User.objects.get(email=email)
         new_password = get_random_string(8)  # Tạo mật khẩu ngẫu nhiên
         user.password = make_password(new_password)
         user.save()
-
         # Gửi mật khẩu qua email
         send_mail(
             subject="Your New Password",
@@ -188,13 +211,10 @@ def forgot_password(request):
             from_email="your_email@example.com",
             recipient_list=[email],
             fail_silently=False,
-        )
-        
+        )        
         # Chuyển hướng đến trang login sau khi gửi email thành công
         return redirect('http://127.0.0.1:8000/api/login/') 
-
     except User.DoesNotExist:
         return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
-
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
