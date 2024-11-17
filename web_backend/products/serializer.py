@@ -1,10 +1,7 @@
 from rest_framework import serializers
-from web_backend.models import Product, ProductRecommendation, ProductAd, Comment
-import cloudinary.uploader
-import tempfile
-from io import BytesIO
-from moviepy.editor import VideoFileClip
-import os
+from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
+from cloudinary.uploader import upload
+from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
@@ -18,6 +15,14 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['user', 'comment', 'rating', 'created_at']
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ['image', 'uploaded_at']
+class ProductVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVideo
+        fields = ['video', 'uploaded_at']
 class ProductSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='category.category_name', allow_null=True)
     seller = serializers.CharField(source='seller.username', read_only=True)
@@ -26,89 +31,70 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
     comments = CommentSerializer(source='comment_set', many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    videos = ProductVideoSerializer(many=True, read_only=True)
     class Meta:
         model = Product
         fields = [
-            'name', 'price', 'category', 'description', 'seller', 'image_url', 'video_url',
+            'name', 'price', 'category', 'description', 'seller', 'images', 'videos',
             'quantity', 'recommendations', 'ads', 'comments'
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
-    image_file = serializers.ImageField(write_only=True, required=False)
-    video_file = serializers.FileField(write_only=True, required=False)
+    images = serializers.ListField(
+        child=serializers.ImageField(allow_empty_file=False), write_only=True, required=False
+    )
+    videos = serializers.ListField(
+        child=serializers.FileField(allow_empty_file=False), write_only=True, required=False
+    )
 
     class Meta:
         model = Product
         fields = [
-            'name', 'price', 'category', 'description', 'seller', 'quantity',
-            'image_url', 'video_url', 'image_file', 'video_file'
+            'name', 'price', 'category', 'description', 'seller', 'images', 'videos', 'quantity'
         ]
 
-    def validate_image_file(self, value):
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("Image size must be under 10MB.")
-        return value
-
-    def validate_video_file(self, value):
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("Video size must be under 10MB.")
-        return value
-
-    def compress_image(self, image_file):
-        from PIL import Image
-        img = Image.open(image_file)
-        img = img.convert('RGB')
-        buffer = BytesIO()
-        img.save(buffer, format="JPEG", quality=85)  # Nén chất lượng 85%
-        buffer.seek(0)
-        return buffer
-
-    def compress_video(self, video_file):
-        # Tạo tệp tạm thời để lưu video đã nén
-        temp_path = video_file.temporary_file_path()
-        temp_video = tempfile.NamedTemporaryFile(delete=False)
-        temp_video_path = temp_video.name
-        
-        clip = VideoFileClip(temp_path)
-        # Nén video xuống bitrate thấp
-        clip.write_videofile(temp_video_path, bitrate="500k", audio_codec="aac")
-        clip.close()
-
-        # Đọc lại video đã nén và đóng tệp tạm thời
-        with open(temp_video_path, 'rb') as compressed_video:
-            return compressed_video
-
     def create(self, validated_data):
-        image_file = validated_data.pop('image_file', None)
-        video_file = validated_data.pop('video_file', None)
+        images = validated_data.pop('images', [])
+        videos = validated_data.pop('videos', [])
+        product = Product.objects.create(**validated_data)
 
-        if image_file:
-            compressed_image = self.compress_image(image_file)
-            upload_result = cloudinary.uploader.upload(compressed_image, resource_type="image")
-            validated_data['image_url'] = upload_result['secure_url']
+        # Upload ảnh
+        for image in images:
+            compressed_image = compress_and_upload_image(image)
+            if compressed_image:  # Chỉ tạo record nếu ảnh đã được upload thành công
+                ProductImage.objects.create(product=product, file=compressed_image)
 
-        if video_file:
-            compressed_video = self.compress_video(video_file)
-            upload_result = cloudinary.uploader.upload(compressed_video, resource_type="video")
-            validated_data['video_url'] = upload_result['secure_url']
+        # Upload video
+        for video in videos:
+            compressed_video = compress_and_upload_video(video)
+            if compressed_video:  # Chỉ tạo record nếu video đã được upload thành công
+                ProductVideo.objects.create(product=product, file=compressed_video)
 
-        return Product.objects.create(**validated_data)
+        return product
 
     def update(self, instance, validated_data):
-        image_file = validated_data.pop('image_file', None)
-        video_file = validated_data.pop('video_file', None)
+        images = validated_data.pop('images', [])
+        videos = validated_data.pop('videos', [])
 
-        if image_file:
-            compressed_image = self.compress_image(image_file)
-            upload_result = cloudinary.uploader.upload(compressed_image, resource_type="image")
-            instance.image_url = upload_result['secure_url']
-
-        if video_file:
-            compressed_video = self.compress_video(video_file)
-            upload_result = cloudinary.uploader.upload(compressed_video, resource_type="video")
-            instance.video_url = upload_result['secure_url']
-
+        # Cập nhật các trường khác
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
         instance.save()
+
+        # Xử lý ảnh và upload lên Cloudinary
+        if images:
+            instance.images.all().delete()
+            for image in images:
+                compressed_image = compress_and_upload_image(image)
+                cloudinary_response = upload(compressed_image, folder='products/images/')
+                ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
+
+        # Xử lý video và upload lên Cloudinary
+        if videos:
+            instance.videos.all().delete()
+            for video in videos:
+                compressed_video = compress_and_upload_video(video)
+                cloudinary_response = upload(compressed_video, resource_type="video", folder='products/videos/')
+                ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
+
         return instance

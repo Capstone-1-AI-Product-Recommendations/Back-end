@@ -21,10 +21,9 @@ def product_detail(request, product_id):
 def create_product(request):
     serializer = CRUDProductSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        product = serializer.save()
+        return Response(ProductSerializer(product).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['PUT'])
 def update_product(request, product_id):
@@ -35,10 +34,9 @@ def update_product(request, product_id):
 
     serializer = CRUDProductSerializer(product, data=request.data, partial=True)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        updated_product = serializer.save()
+        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['DELETE'])
 def delete_product(request, product_id):

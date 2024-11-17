@@ -154,8 +154,6 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField(default=0) 
-    image_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
-    video_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL video
     
     class Meta:
         managed = True
@@ -171,7 +169,24 @@ class ProductAd(models.Model):
         managed = True
         db_table = 'product_ad'
 
-
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE, to_field='product_id')
+    file = models.URLField()  # Lưu trữ URL của ảnh đã upload
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        managed = True
+        db_table = 'product_image'
+        
+class ProductVideo(models.Model):
+    product = models.ForeignKey(Product, related_name='videos', on_delete=models.CASCADE, to_field='product_id')
+    file = models.URLField()  # Lưu trữ URL của video đã upload
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        managed = True
+        db_table = 'product_video'
+        
 class ProductRecommendation(models.Model):
     recommendation_id = models.AutoField(primary_key=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
@@ -184,6 +199,7 @@ class ProductRecommendation(models.Model):
     class Meta:
         managed = True
         db_table = 'product_recommendation'
+
 
 
 class Role(models.Model):
@@ -201,6 +217,7 @@ class User(models.Model):
     password = models.CharField(max_length=255)
     email = models.CharField(unique=True, max_length=100)
     full_name = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     reset_token = models.CharField(max_length=50, blank=True, null=True)  # Mã token reset mật khẩu
     reset_token_expiry = models.DateTimeField(blank=True, null=True)  # Thời gian hết hạn của token

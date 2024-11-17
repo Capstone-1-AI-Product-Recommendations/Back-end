@@ -24,13 +24,10 @@ config = {
 @csrf_exempt
 @api_view(['POST'])
 def cod_payment(request, order_id):
-    """ API thanh toán khi nhận hàng (Cash on Delivery) """
     try:
         order = get_object_or_404(Order, order_id=order_id)
-
         if order.status != 'PENDING':
             return Response({"message": "Order is not in pending status."}, status=status.HTTP_400_BAD_REQUEST)
-
         # Tạo bản ghi thanh toán khi nhận hàng
         payment = Payment.objects.create(
             user=order.user,
@@ -40,15 +37,12 @@ def cod_payment(request, order_id):
             payment_method="Cash on Delivery",
             transaction_id=f"CASH_{timezone.now().strftime('%Y%m%d%H%M%S')}",
         )
-
         # Cập nhật trạng thái đơn hàng
         order.status = 'COMPLETED'
         order.save()
-
         # Dùng serializer để trả về thông tin Payment
         payment_serializer = PaymentSerializer(payment)
         return Response(payment_serializer.data, status=status.HTTP_200_OK)
-
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

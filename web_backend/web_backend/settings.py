@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -120,11 +119,12 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Cấu hình Cloudinary
-CLOUDINARY = {
+CLOUDINARY_STORAGE = {
     'CLOUD_NAME': 'dkleeailh',
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
+
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 # CLOUD_NAME = 'dkleeailh'
 # API_KEY = '171326873511271'
