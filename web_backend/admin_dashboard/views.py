@@ -87,3 +87,44 @@ def search_users(request):
         return Response(serialized_data, status=status.HTTP_200_OK)
     else:
         return Response({'message': 'No users found matching the query'}, status=status.HTTP_404_NOT_FOUND)
+
+# API xem danh sách người dùng theo role
+@api_view(['GET'])
+@admin_required
+def get_users_by_role(request, role_name):
+    try:
+        users = User.objects.filter(role__role_name=role_name)
+        serialized_data = UserSerializer(users, many=True).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    except Role.DoesNotExist:
+        return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API check trang thái của người dùng
+@api_view(['GET'])
+@admin_required
+def check_user_active_status(request, user_id):
+    try:
+        user = User.objects.get(user_id=user_id)
+        return Response({
+            'user_id': user.user_id,
+            'username': user.username,
+            'is_active': user.is_active
+        }, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# API active / ban tài khoản người dùng
+@api_view(['PUT'])
+@admin_required
+def toggle_user_active_status(request, user_id):
+    try:
+        user = User.objects.get(user_id=user_id)
+        user.is_active = not user.is_active
+        user.save()
+        return Response({
+            'message': f"User {'activated' if user.is_active else 'deactivated'} successfully.",
+            'is_active': user.is_active
+        }, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
