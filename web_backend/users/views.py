@@ -218,3 +218,38 @@ def forgot_password(request):
         return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['PUT'])
+def update_user(request):
+    user_id = request.data.get('user_id')  # Lấy `user_id` từ yêu cầu
+    if not user_id:
+        return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        # Tìm kiếm người dùng với ID được cung cấp
+        user = User.objects.get(user_id=user_id)
+        # Cập nhật thông tin người dùng từ request data
+        fields_to_update = ['full_name', 'email', 'phone_number', 'address']
+        for field in fields_to_update:
+            if field in request.data:
+                setattr(user, field, request.data[field])
+        # Lưu các thay đổi vào cơ sở dữ liệu
+        user.save()
+        # Trả về thông tin người dùng sau khi cập nhật
+        return Response(
+            {
+                "message": "User information updated successfully.",
+                "updated_data": {
+                    "user_id": user.user_id,
+                    "username": user.username,
+                    "full_name": user.full_name,
+                    "email": user.email,
+                    "phone_number": user.phone_number,
+                    "address": user.address,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+    except User.DoesNotExist:
+        return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

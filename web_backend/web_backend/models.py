@@ -218,6 +218,7 @@ class User(models.Model):
     email = models.CharField(unique=True, max_length=100)
     full_name = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     reset_token = models.CharField(max_length=50, blank=True, null=True)  # Mã token reset mật khẩu
     reset_token_expiry = models.DateTimeField(blank=True, null=True)  # Thời gian hết hạn của token
