@@ -1,28 +1,26 @@
+import cloudinary
+import cloudinary.uploader
+import io
 from PIL import Image
-from io import BytesIO
-from cloudinary.uploader import upload
 
 def compress_and_upload_image(image_file):
-    try:
-        # Nén ảnh
-        image = Image.open(image_file)
-        image = image.convert('RGB')  # Chuyển ảnh sang RGB nếu cần thiết
-        output = BytesIO()
-        image.save(output, format="JPEG", quality=85)  # Chất lượng ảnh 85%
-        output.seek(0)
+    img = Image.open(image_file)
+    img_io = io.BytesIO()
+    img.save(img_io, format='JPEG', quality=85)  # Giảm chất lượng để nén
+    img_io.seek(0)
 
-        # Upload ảnh lên Cloudinary
-        response = upload(output, folder='products/images/')
-        return response['secure_url']
-    except Exception as e:
-        print(f"Error uploading image: {e}")
-        return None
+    response = cloudinary.uploader.upload(
+        img_io,
+        folder="products/images/",
+        resource_type="image",
+    )
+    return response.get('secure_url')
 
 def compress_and_upload_video(video_file):
-    try:
-        # Upload video lên Cloudinary
-        response = upload(video_file, resource_type="video", folder='products/videos/')
-        return response['secure_url']
-    except Exception as e:
-        print(f"Error uploading video: {e}")
-        return None
+    response = cloudinary.uploader.upload(
+        video_file,
+        folder="products/videos/",
+        resource_type="video",
+        chunk_size=10 * 1024 * 1024  # Đảm bảo từng chunk nhỏ hơn 10MB
+    )
+    return response.get('secure_url')

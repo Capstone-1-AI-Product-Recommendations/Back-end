@@ -2,6 +2,8 @@ from rest_framework import serializers
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
 from cloudinary.uploader import upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
+import requests
+from django.core.files.base import ContentFile
 class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
@@ -41,34 +43,36 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
     images = serializers.ListField(
-        child=serializers.ImageField(allow_empty_file=False), write_only=True, required=False
+        child=serializers.CharField(), write_only=True, required=False
     )
     videos = serializers.ListField(
-        child=serializers.FileField(allow_empty_file=False), write_only=True, required=False
+        child=serializers.CharField(), write_only=True, required=False
     )
 
     class Meta:
         model = Product
-        fields = [
-            'name', 'price', 'category', 'description', 'seller', 'images', 'videos', 'quantity'
-        ]
+        fields = ['name', 'price', 'category', 'description', 'seller', 'quantity', 'images', 'videos']
 
     def create(self, validated_data):
         images = validated_data.pop('images', [])
         videos = validated_data.pop('videos', [])
-        product = Product.objects.create(**validated_data)
+        product = super().create(validated_data)
 
-        # Upload ảnh
-        for image in images:
-            compressed_image = compress_and_upload_image(image)
-            if compressed_image:  # Chỉ tạo record nếu ảnh đã được upload thành công
-                ProductImage.objects.create(product=product, file=compressed_image)
+        # Download and upload images
+        for image_url in images:
+            response = requests.get(image_url)
+            if response.status_code == 200:
+                file_name = image_url.split("/")[-1]
+                file = ContentFile(response.content, name=file_name)
+                product.images.create(file=file)
 
-        # Upload video
-        for video in videos:
-            compressed_video = compress_and_upload_video(video)
-            if compressed_video:  # Chỉ tạo record nếu video đã được upload thành công
-                ProductVideo.objects.create(product=product, file=compressed_video)
+        # Download and upload videos
+        for video_url in videos:
+            response = requests.get(video_url)
+            if response.status_code == 200:
+                file_name = video_url.split("/")[-1]
+                file = ContentFile(response.content, name=file_name)
+                product.videos.create(file=file)
 
         return product
 
