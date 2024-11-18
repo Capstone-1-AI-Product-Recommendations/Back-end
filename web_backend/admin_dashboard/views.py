@@ -128,3 +128,38 @@ def toggle_user_active_status(request, user_id):
         }, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Tạo Thông Báo Cho Người Dùng
+@api_view(['POST'])
+@admin_required
+def send_notification(request):
+    user_id = request.data.get('user_id')
+    message = request.data.get('message')
+
+    if not message:
+        return Response({'error': 'Message is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user_id == 'all':
+        users = User.objects.all()
+    else:
+        try:
+            users = [User.objects.get(user_id=user_id)]
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    for user in users:
+        Notification.objects.create(user=user, message=message, is_read=0)
+
+    return Response({'message': 'Notification(s) sent successfully'}, status=status.HTTP_201_CREATED)
+
+# API Xem Lịch Sử Thông Báo Được Gửi
+@api_view(['GET'])
+@admin_required
+def get_notification_history(request, user_id=None):
+    if user_id:
+        notifications = Notification.objects.filter(user_id=user_id)
+    else:
+        notifications = Notification.objects.all()
+
+    serialized_data = NotificationSerializer(notifications, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
