@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
-from cloudinary.uploader import upload
+from cloudinary.uploader import upload as cloudinary_upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 import requests
 from django.core.files.base import ContentFile
+
 class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
@@ -43,10 +44,10 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
     images = serializers.ListField(
-        child=serializers.CharField(), write_only=True, required=False
+        child=serializers.ImageField(), write_only=True, required=False
     )
     videos = serializers.ListField(
-        child=serializers.CharField(), write_only=True, required=False
+        child=serializers.FileField(), write_only=True, required=False
     )
 
     class Meta:
@@ -58,21 +59,15 @@ class CRUDProductSerializer(serializers.ModelSerializer):
         videos = validated_data.pop('videos', [])
         product = super().create(validated_data)
 
-        # Download and upload images
-        for image_url in images:
-            response = requests.get(image_url)
-            if response.status_code == 200:
-                file_name = image_url.split("/")[-1]
-                file = ContentFile(response.content, name=file_name)
-                product.images.create(file=file)
+        # Upload images
+        for image in images:
+            image_url = compress_and_upload_image(image)
+            product.images.create(file=image_url)
 
-        # Download and upload videos
-        for video_url in videos:
-            response = requests.get(video_url)
-            if response.status_code == 200:
-                file_name = video_url.split("/")[-1]
-                file = ContentFile(response.content, name=file_name)
-                product.videos.create(file=file)
+        # Upload videos
+        for video in videos:
+            video_url = compress_and_upload_video(video)
+            product.videos.create(file=video_url)
 
         return product
 

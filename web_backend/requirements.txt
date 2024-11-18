@@ -37,3 +37,4 @@ moviepy[optional]
 scipy
 opencv-python
 imageio[ffmpeg]
+python-decouple

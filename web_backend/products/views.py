@@ -28,6 +28,7 @@ def create_product(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
+@parser_classes([MultiPartParser, FormParser])
 def update_product(request, product_id):
     try:
         product = Product.objects.get(pk=product_id)
