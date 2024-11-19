@@ -2,8 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.contrib.auth import logout
-from .serializer import UserSerializer, LoginSerializer, RoleSerializer
-from web_backend.models import Role, User
+from .serializer import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer
+from web_backend.models import Role, User, UserBankAccount
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt, requests
@@ -253,3 +253,47 @@ def update_user(request):
         return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def get_user_bank_accounts(request, user_id):
+    # Lấy danh sách tài khoản ngân hàng của người dùng theo user_id
+    bank_accounts = UserBankAccount.objects.filter(user__user_id=user_id)
+    serializer = UserBankAccountSerializer(bank_accounts, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def create_user_bank_account(request, user_id):
+    try:
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({'detail': 'Người dùng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = UserBankAccountSerializer(data=request.data, context={'user_id': user_id})  # Truyền user_id vào context
+    if serializer.is_valid():
+        serializer.save()  # Lưu tài khoản ngân hàng
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PUT'])
+def update_user_bank_account(request, bank_account_id):
+    try:
+        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
+    except UserBankAccount.DoesNotExist:
+        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Cập nhật thông tin tài khoản ngân hàng
+    serializer = UserBankAccountSerializer(bank_account, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()  # Lưu các thay đổi
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+def delete_user_bank_account(request, bank_account_id):
+    try:
+        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
+    except UserBankAccount.DoesNotExist:
+        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+
+    bank_account.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

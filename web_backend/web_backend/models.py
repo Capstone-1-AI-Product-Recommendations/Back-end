@@ -235,11 +235,16 @@ class User(models.Model):
 
 class UserBankAccount(models.Model):
     bank_account_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Liên kết với bảng User
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_accounts')  # Thêm related_name để dễ truy xuất ngược lại
     bank_name = models.CharField(max_length=100)  # Tên ngân hàng
     account_number = models.CharField(max_length=20)  # Số tài khoản ngân hàng
     account_holder_name = models.CharField(max_length=100)  # Chủ tài khoản
-    account_type = models.CharField(max_length=50, blank=True, null=True)  # Loại tài khoản (Thanh toán, Tiết kiệm, ...)
+    account_type = models.CharField(
+        max_length=50,
+        choices=[('Savings', 'Tiết kiệm'), ('Current', 'Thanh toán')],  # Thêm lựa chọn cho loại tài khoản
+        null=True,  # Cho phép giá trị null
+        blank=True   # Cho phép để trống
+    )
 
     class Meta:
         managed = True
