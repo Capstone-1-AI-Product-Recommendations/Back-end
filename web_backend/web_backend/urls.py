@@ -29,6 +29,7 @@ urlpatterns = [
    path('api/', include('orders.urls')),
    path('api/', include('payments.urls')),
    path('api/', include('carts.urls')),
+   path('api/', include('sellr_dashboard.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
