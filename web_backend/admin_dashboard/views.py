@@ -9,8 +9,10 @@ from django.db.models import Q
 from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
 from users.models import User
+from products.models import Category
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
+from products.serializers import CategorySerializer
 from seller_dashboard.serializers import AdSerializer
 from users.decorators import admin_required
 
@@ -163,3 +165,39 @@ def get_notification_history(request, user_id=None):
 
     serialized_data = NotificationSerializer(notifications, many=True).data
     return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Tạo một danh mục sản phẩm mới
+@api_view(['POST'])
+@admin_required
+def create_category(request):
+    serializer = CategorySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# API Cập nhật danh mục sản phẩm
+@api_view(['PUT'])
+@admin_required
+def update_category(request, category_id):
+    try:
+        category = Category.objects.get(pk=category_id)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = CategorySerializer(category, data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# API Xóa danh 1 danh mục sản phẩm
+@api_view(['DELETE'])
+@admin_required
+def delete_category(request, category_id):
+    try:
+        category = Category.objects.get(pk=category_id)
+        category.delete()
+        return Response({'message': 'Category deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+    except Category.DoesNotExist:
+        return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
