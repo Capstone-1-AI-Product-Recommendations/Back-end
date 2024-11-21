@@ -20,3 +20,4 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['comment_id', 'user', 'product', 'comment', 'rating', 'created_at']
+
