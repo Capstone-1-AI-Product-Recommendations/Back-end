@@ -10,9 +10,11 @@ from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
 from users.models import User
 from products.models import Category
+from orders.models import Order
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
 from products.serializers import CategorySerializer
+from orders.serializers import OrderSerializer
 from seller_dashboard.serializers import AdSerializer
 from users.decorators import admin_required
 
@@ -201,3 +203,33 @@ def delete_category(request, category_id):
         return Response({'message': 'Category deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Lấy danh sách đơn hàng
+@api_view(['GET'])
+@admin_required
+def get_orders(request):
+    orders = Order.objects.all().order_by('-created_at')  # Sắp xếp theo ngày tạo
+    serialized_data = OrderSerializer(orders, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Tìm kiếm đơn hàng
+@api_view(['GET'])
+@admin_required
+def search_orders(request):
+    query = request.query_params.get('query', '').strip()
+
+    if not query:
+        return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Tìm kiếm theo ID đơn hàng, username người dùng, hoặc trạng thái đơn hàng
+    orders = Order.objects.filter(
+        Q(order_id__icontains=query) |
+        Q(user__username__icontains=query) |
+        Q(status__icontains=query)
+    ).distinct().order_by('-created_at')
+
+    if orders.exists():
+        serialized_data = OrderSerializer(orders, many=True).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+
+    return Response({'message': 'No orders found matching the query'}, status=status.HTTP_404_NOT_FOUND)
