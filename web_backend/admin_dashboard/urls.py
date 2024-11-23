@@ -22,4 +22,9 @@ urlpatterns = [
 
     path('orders/', views.get_orders, name='get_orders'), # API Lấy danh sách đơn hàng
     path('orders/search/', views.search_orders, name='search_orders'), # API Tìm kiếm đơn hàng
+    path('orders/<int:order_id>/', views.get_order_detail, name='get_order_detail'), # API chi tiết đơn hàng
+    path('orders/<int:order_id>/status/', views.update_order_status, name='update_order_status'), # API Cập nhật trạng thái đơn hàng
+    path('orders/<int:order_id>/delete/', views.delete_order, name='delete_order'), # API Xóa đơn hàng
+
+    
 ]

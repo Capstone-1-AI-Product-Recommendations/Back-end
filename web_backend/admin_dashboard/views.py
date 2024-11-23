@@ -233,3 +233,43 @@ def search_orders(request):
         return Response(serialized_data, status=status.HTTP_200_OK)
 
     return Response({'message': 'No orders found matching the query'}, status=status.HTTP_404_NOT_FOUND)
+
+# API chi tiết đơn hàng
+@api_view(['GET'])
+@admin_required
+def get_order_detail(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        serialized_data = OrderSerializer(order).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# API Cập nhật trạng thái đơn hàng
+@api_view(['PUT'])
+@admin_required
+def update_order_status(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = new_status
+        order.save()
+        return Response({'message': 'Order status updated successfully'}, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# API Xóa đơn hàng
+@api_view(['DELETE'])
+@admin_required
+def delete_order(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        order.delete()
+        return Response({'message': 'Order deleted successfully'}, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
