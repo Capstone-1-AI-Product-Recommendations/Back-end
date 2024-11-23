@@ -1,23 +1,47 @@
 from rest_framework import serializers
-from web_backend.models import Order, Comment, Ad, Product
+from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
+
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = '__all__'
 
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
-        fields = ['order_id', 'user', 'total', 'status', 'created_at', 'updated_at']
+        fields = '__all__'
 
-class OrderStatusUpdateSerializer(serializers.Serializer):
-    status = serializers.CharField(max_length=50)
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = '__all__'
 
-class CouponSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=255)
-    description = serializers.CharField(required=False, allow_blank=True)
-    discount_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
-    start_date = serializers.DateField()
-    end_date = serializers.DateField()
+class AdSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ad
+        fields = '__all__'
 
-class ReviewSerializer(serializers.ModelSerializer):
+class ProductAdSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAd
+        fields = '__all__'
+
+class SellerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SellerProfile
+        fields = '__all__'
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+
+class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ['comment_id', 'user', 'product', 'comment', 'rating', 'created_at']
+        fields = '__all__'
 
+class ProductRecommendationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductRecommendation
+        fields = '__all__'

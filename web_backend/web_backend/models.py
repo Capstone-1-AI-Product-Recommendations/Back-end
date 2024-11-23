@@ -210,7 +210,16 @@ class Role(models.Model):
         managed = True
         db_table = 'role'
 
+class SellerProfile(models.Model):
+    seller_id = models.CharField(primary_key=True, max_length=50)
+    user = models.OneToOneField('User', on_delete=models.CASCADE, related_name='seller_profile')
+    store_name = models.CharField(max_length=255, blank=True, null=True)
+    store_address = models.TextField(blank=True, null=True)
 
+    class Meta:
+        managed = True
+        db_table = 'seller_profile'
+        
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
@@ -229,6 +238,8 @@ class User(models.Model):
         if not self.role:
             self.role = Role.objects.get_or_create(role_name="User")[0]
         super().save(*args, **kwargs)
+        if self.role and self.role.role_name == "Seller" and not hasattr(self, 'seller_profile'):
+            SellerProfile.objects.get_or_create(user=self)
     class Meta:
         managed = True
         db_table = 'user'
