@@ -273,3 +273,33 @@ def delete_order(request, order_id):
         return Response({'message': 'Order deleted successfully'}, status=status.HTTP_200_OK)
     except Order.DoesNotExist:
         return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Lấy danh sách hành vi duyệt web
+@api_view(['GET'])
+@admin_required
+def get_user_browsing_behaviors(request):
+    behaviors = UserBrowsingBehavior.objects.all()
+    serialized_data = UserBrowsingBehaviorSerializer(behaviors, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Lấy chi tiết hành vi duyệt web
+@api_view(['GET'])
+@admin_required
+def get_user_browsing_behavior_detail(request, behavior_id):
+    try:
+        behavior = UserBrowsingBehavior.objects.get(behavior_id=behavior_id)
+        serialized_data = UserBrowsingBehaviorSerializer(behavior).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    except UserBrowsingBehavior.DoesNotExist:
+        return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Xóa hành vi duyệt web
+@api_view(['DELETE'])
+@admin_required
+def delete_user_browsing_behavior(request, behavior_id):
+    try:
+        behavior = UserBrowsingBehavior.objects.get(behavior_id=behavior_id)
+        behavior.delete()
+        return Response({'message': 'Browsing behavior deleted successfully'}, status=status.HTTP_200_OK)
+    except UserBrowsingBehavior.DoesNotExist:
+        return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
