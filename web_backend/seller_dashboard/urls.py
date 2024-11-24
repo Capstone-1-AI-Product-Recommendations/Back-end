@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import get_orders, get_order_details, create_ad, update_ad, get_seller_profile, update_seller_profile, associate_ad_with_product, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report
+from .views import get_orders, get_order_details, create_ad, update_ad, get_seller_profile, update_seller_profile, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report
 
 urlpatterns = [
     # Quản lý đơn hàng
@@ -8,14 +8,11 @@ urlpatterns = [
 
     # Quản lý quảng cáo
     path('seller/<int:seller_id>/create_ads/<int:product_id>/', create_ad, name='create_ad'),
-    path('seller/<int:seller_id>/update_ads/<int:ad_id>/', update_ad, name='update_ad'),
+    path('seller/<int:seller_id>/update_ads/<int:product_id>/<int:ad_id>/', update_ad, name='update_ad'),
 
     # Quản lý hồ sơ seller
     path('seller/profile/<int:seller_id>/', get_seller_profile, name='get_seller_profile'),
     path('seller/update_profile/<int:seller_id>/', update_seller_profile, name='update_seller_profile'),
-
-    # Quản lý quảng cáo sản phẩm
-    path('seller/product_ads/<int:seller_id>/', associate_ad_with_product, name='associate_ad_with_product'),
 
     # Thông báo và phản hồi của người dùng
     path('seller/notifications/<int:seller_id>/', get_notifications, name='get_notifications'),

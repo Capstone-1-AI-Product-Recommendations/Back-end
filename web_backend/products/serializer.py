@@ -21,11 +21,11 @@ class CommentSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['image', 'uploaded_at']
+        fields = ['file', 'uploaded_at']
 class ProductVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVideo
-        fields = ['video', 'uploaded_at']
+        fields = ['file', 'uploaded_at']
 class ProductSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='category.category_name', allow_null=True)
     seller = serializers.CharField(source='seller.username', read_only=True)

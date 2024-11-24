@@ -27,37 +27,56 @@ def get_order_details(request, seller_id, order_id):
 @api_view(['POST'])
 def create_ad(request, seller_id, product_id):
     try:
-        # Kiểm tra seller tồn tại
-        seller = SellerProfile.objects.get(user_id=seller_id)
-    except SellerProfile.DoesNotExist:
-        return Response({"error": f"Seller with ID {seller_id} not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    try:
-        # Kiểm tra sản phẩm có tồn tại và thuộc seller này
-        product = Product.objects.get(product_id=product_id, seller_id=seller.user_id)
+        # Kiểm tra sản phẩm có tồn tại và thuộc về seller hay không
+        product = Product.objects.get(product_id=product_id, seller_id=seller_id)
     except Product.DoesNotExist:
-        return Response({"error": f"Product with ID {product_id} not found or does not belong to this seller."}, 
-                        status=status.HTTP_404_NOT_FOUND)
-
+        return Response(
+            {"error": "Product does not belong to this seller or does not exist."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    # Tạo mới quảng cáo
     ad_data = request.data.copy()
-    ad_data['product'] = product.product_id
-
-    serializer = AdSerializer(data=ad_data)
-    
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    ad_serializer = AdSerializer(data=ad_data)
+    if ad_serializer.is_valid():
+        ad = ad_serializer.save()  # Lưu quảng cáo
+        # Tạo liên kết giữa quảng cáo và sản phẩm
+        product_ad = {
+            "product": product.product_id,
+            "ad": ad.ad_id
+        }
+        product_ad_serializer = ProductAdSerializer(data=product_ad)
+        if product_ad_serializer.is_valid():
+            product_ad_serializer.save()
+            return Response({
+                "ad": ad_serializer.data,
+                "product_ad": product_ad_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            # Xóa quảng cáo nếu liên kết thất bại
+            ad.delete()
+            return Response(product_ad_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(ad_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
-def update_ad(request, seller_id, ad_id):
-    ad = get_object_or_404(Ad, id=ad_id, seller_id=seller_id)
+def update_ad(request, seller_id, ad_id, product_id):
+    try:
+        # Kiểm tra xem sản phẩm thuộc seller có tồn tại không
+        product = Product.objects.get(product_id=product_id, seller_id=seller_id)        
+        # Kiểm tra xem quảng cáo liên kết với sản phẩm này có tồn tại không
+        product_ad = ProductAd.objects.get(product=product, ad_id=ad_id)
+        ad = product_ad.ad  # Truy xuất quảng cáo từ ProductAd        
+    except (Product.DoesNotExist, ProductAd.DoesNotExist):
+        return Response(
+            {"error": "Ad or product does not exist for this seller."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    # Tiến hành cập nhật quảng cáo
     serializer = AdSerializer(ad, data=request.data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Quản lý hồ sơ seller
 @api_view(['GET'])
@@ -68,26 +87,21 @@ def get_seller_profile(request, seller_id):
 
 @api_view(['PUT'])
 def update_seller_profile(request, seller_id):
+    # Lấy hồ sơ người bán dựa trên seller_id
     seller_profile = get_object_or_404(SellerProfile, user_id=seller_id)
-    serializer = SellerProfileSerializer(seller_profile, data=request.data)
+    # Chỉ cần cập nhật các trường khác như store_name, store_address
+    serializer = SellerProfileSerializer(seller_profile, data=request.data, partial=True)  # partial=True để chỉ cập nhật các trường cần thiết
     if serializer.is_valid():
+        # Cập nhật hồ sơ người bán
         serializer.save()
-        return Response(serializer.data)
+        return Response(serializer.data)    
+    # Trả về lỗi nếu dữ liệu không hợp lệ
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Quản lý quảng cáo sản phẩm
-@api_view(['POST'])
-def associate_ad_with_product(request, seller_id):
-    serializer = ProductAdSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Thông báo và Quản lý Phản hồi của Người dùng
+# Thông báo và Quản lý Phản hồi của Người Dùng
 @api_view(['GET'])
 def get_notifications(request, seller_id):
-    notifications = Notification.objects.filter(user_id=seller_id)
+    notifications = Notification.objects.filter(user__seller_profile__user_id=seller_id)
     serializer = NotificationSerializer(notifications, many=True)
     return Response(serializer.data)
 
@@ -96,6 +110,7 @@ def get_comments(request, seller_id):
     comments = Comment.objects.filter(product__seller_id=seller_id)
     serializer = CommentSerializer(comments, many=True)
     return Response(serializer.data)
+
 
 # Báo cáo và thống kê
 @api_view(['GET'])
@@ -110,9 +125,10 @@ def ad_performance(request, seller_id):
     serializer = ProductAdSerializer(product_ads, many=True)
     return Response(serializer.data)
 
+
 # Quản lý khuyến nghị sản phẩm
 @api_view(['GET'])
 def get_product_recommendations(request, seller_id):
-    recommendations = ProductRecommendation.objects.filter(user_id=seller_id)
+    recommendations = ProductRecommendation.objects.filter(product__seller_id=seller_id)
     serializer = ProductRecommendationSerializer(recommendations, many=True)
     return Response(serializer.data)
