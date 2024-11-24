@@ -7,7 +7,7 @@ urlpatterns = [
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', get_order_details, name='get_order_details'),
 
     # Quản lý quảng cáo
-    path('seller/create_ads/<int:seller_id>/', create_ad, name='create_ad'),
+    path('seller/<int:seller_id>/create_ads/<int:product_id>/', create_ad, name='create_ad'),
     path('seller/<int:seller_id>/update_ads/<int:ad_id>/', update_ad, name='update_ad'),
 
     # Quản lý hồ sơ seller
