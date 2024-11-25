@@ -7,11 +7,13 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.core.exceptions import ValidationError
+import re
+    
+def validate_email_format(value):
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, value):
+        raise ValidationError("Invalid email format.")
 
-def validate_file_size(file):
-    max_size = 10 * 1024 * 1024  # 10MB
-    if file.size > max_size:
-        raise ValidationError("File size exceeds the 10MB limit.")
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -152,8 +154,6 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField(default=0) 
-    image_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL ảnh
-    video_url = models.URLField(max_length=255, blank=True, null=True)  # Lưu URL video
     
     class Meta:
         managed = True
@@ -169,7 +169,24 @@ class ProductAd(models.Model):
         managed = True
         db_table = 'product_ad'
 
-
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE, to_field='product_id')
+    file = models.URLField()  # Lưu trữ URL của ảnh đã upload
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        managed = True
+        db_table = 'product_image'
+        
+class ProductVideo(models.Model):
+    product = models.ForeignKey(Product, related_name='videos', on_delete=models.CASCADE, to_field='product_id')
+    file = models.URLField()  # Lưu trữ URL của video đã upload
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        managed = True
+        db_table = 'product_video'
+        
 class ProductRecommendation(models.Model):
     recommendation_id = models.AutoField(primary_key=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
@@ -184,6 +201,7 @@ class ProductRecommendation(models.Model):
         db_table = 'product_recommendation'
 
 
+
 class Role(models.Model):
     role_id = models.AutoField(primary_key=True)
     role_name = models.CharField(unique=True, max_length=50)
@@ -192,14 +210,27 @@ class Role(models.Model):
         managed = True
         db_table = 'role'
 
+class SellerProfile(models.Model):
+    seller_id = models.CharField(primary_key=True, max_length=50)
+    user = models.OneToOneField('User', on_delete=models.CASCADE, related_name='seller_profile')
+    store_name = models.CharField(max_length=255, blank=True, null=True)
+    store_address = models.TextField(blank=True, null=True)
 
+    class Meta:
+        managed = True
+        db_table = 'seller_profile'
+        
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
     password = models.CharField(max_length=255)
     email = models.CharField(unique=True, max_length=100)
     full_name = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
+    reset_token = models.CharField(max_length=50, blank=True, null=True)  # Mã token reset mật khẩu
+    reset_token_expiry = models.DateTimeField(blank=True, null=True)  # Thời gian hết hạn của token
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
@@ -207,17 +238,24 @@ class User(models.Model):
         if not self.role:
             self.role = Role.objects.get_or_create(role_name="User")[0]
         super().save(*args, **kwargs)
+        if self.role and self.role.role_name == "Seller" and not hasattr(self, 'seller_profile'):
+            SellerProfile.objects.get_or_create(user=self)
     class Meta:
         managed = True
         db_table = 'user'
 
 class UserBankAccount(models.Model):
     bank_account_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Liên kết với bảng User
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_accounts')  # Thêm related_name để dễ truy xuất ngược lại
     bank_name = models.CharField(max_length=100)  # Tên ngân hàng
     account_number = models.CharField(max_length=20)  # Số tài khoản ngân hàng
     account_holder_name = models.CharField(max_length=100)  # Chủ tài khoản
-    account_type = models.CharField(max_length=50, blank=True, null=True)  # Loại tài khoản (Thanh toán, Tiết kiệm, ...)
+    account_type = models.CharField(
+        max_length=50,
+        choices=[('Savings', 'Tiết kiệm'), ('Current', 'Thanh toán')],  # Thêm lựa chọn cho loại tài khoản
+        null=True,  # Cho phép giá trị null
+        blank=True   # Cho phép để trống
+    )
 
     class Meta:
         managed = True

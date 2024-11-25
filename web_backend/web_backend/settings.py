@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -97,6 +96,11 @@ SESSION_COOKIE_AGE = 3600
 
 WSGI_APPLICATION = "web_backend.wsgi.application"
 
+GOOGLE_CLIENT_ID = '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com'
+GOOGLE_CLIENT_SECRET = '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'
+GOOGLE_REDIRECT_URI = 'http://127.0.0.1:8000/api/auth/callback/'
+
+
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": [
@@ -106,8 +110,8 @@ SOCIALACCOUNT_PROVIDERS = {
         "AUTH_PARAMS": {"access_type": "online"},
         "OAUTH_PKCE_ENABLED": True,
         "APP": {
-            'client_id' : '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com',
-            'secret' : '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',
+            'client_id' : GOOGLE_CLIENT_ID,
+            'secret' : GOOGLE_CLIENT_SECRET,
             'key' : ''
         }
         
@@ -115,11 +119,13 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Cấu hình Cloudinary
-CLOUDINARY = {
+CLOUDINARY_STORAGE = {
     'CLOUD_NAME': 'dkleeailh',
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 # CLOUD_NAME = 'dkleeailh'
 # API_KEY = '171326873511271'
 # API_SECRET = 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
@@ -192,17 +198,19 @@ MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
 
-# Giới hạn kích thước tệp (10MB)
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [        
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication'
+        'rest_framework.authentication.TokenAuthentication',
+        # 'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
         # 'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
     ],
 }
 
@@ -211,8 +219,8 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.Emailbackend'
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 LOGIN_URL = 'login'
 LOGOUT_URL = 'logout'
@@ -226,6 +234,13 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = [
-    'http://localhost:8000',  
+    'http://127.0.0.1:8000',  
 ]
+
+EMAIL_HOST = 'smtp.gmail.com'  # Máy chủ SMTP của Gmail
+EMAIL_PORT = 587  # Cổng SMTP cho Gmail
+EMAIL_USE_TLS = True  # Sử dụng TLS
+EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
+EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
+DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
 
