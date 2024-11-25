@@ -98,7 +98,7 @@ def update_seller_profile(request, seller_id):
     # Trả về lỗi nếu dữ liệu không hợp lệ
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Thông báo và Quản lý Phản hồi của Người Dùng
+# Thông báo và Quản lý Phản hồi 
 @api_view(['GET'])
 def get_notifications(request, seller_id):
     notifications = Notification.objects.filter(user__seller_profile__user_id=seller_id)
@@ -111,6 +111,15 @@ def get_comments(request, seller_id):
     serializer = CommentSerializer(comments, many=True)
     return Response(serializer.data)
 
+# Bình luận cho một sản phẩm
+@api_view(['GET'])
+def get_comments_for_product(request, seller_id, product_id):
+    comments = Comment.objects.filter(
+        product__seller_id=seller_id,
+        product_id=product_id
+    )
+    serializer = CommentSerializer(comments, many=True)
+    return Response(serializer.data)
 
 # Báo cáo và thống kê
 @api_view(['GET'])
@@ -125,10 +134,39 @@ def ad_performance(request, seller_id):
     serializer = ProductAdSerializer(product_ads, many=True)
     return Response(serializer.data)
 
+# Báo cáo doanh thu cho một sản phẩm
+@api_view(['GET'])
+def sales_report_for_product(request, seller_id, product_id):
+    orders = Order.objects.filter(
+        orderitem__product__seller_id=seller_id,
+        orderitem__product_id=product_id
+    ).distinct()
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)
+
+# Hiệu suất quảng cáo cho một sản phẩm
+@api_view(['GET'])
+def ad_performance_for_product(request, seller_id, product_id):
+    product_ads = ProductAd.objects.filter(
+        product__seller_id=seller_id,
+        product_id=product_id
+    )
+    serializer = ProductAdSerializer(product_ads, many=True)
+    return Response(serializer.data)
 
 # Quản lý khuyến nghị sản phẩm
 @api_view(['GET'])
 def get_product_recommendations(request, seller_id):
     recommendations = ProductRecommendation.objects.filter(product__seller_id=seller_id)
+    serializer = ProductRecommendationSerializer(recommendations, many=True)
+    return Response(serializer.data)
+
+# Khuyến nghị cho một sản phẩm
+@api_view(['GET'])
+def get_product_recommendations_for_product(request, seller_id, product_id):
+    recommendations = ProductRecommendation.objects.filter(
+        product__seller_id=seller_id,
+        product_id=product_id
+    )
     serializer = ProductRecommendationSerializer(recommendations, many=True)
     return Response(serializer.data)

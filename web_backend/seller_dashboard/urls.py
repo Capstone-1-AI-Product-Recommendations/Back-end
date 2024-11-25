@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import get_orders, get_order_details, create_ad, update_ad, get_seller_profile, update_seller_profile, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report
+from .views import get_orders, get_order_details, create_ad, update_ad, get_seller_profile, update_seller_profile, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report, get_comments_for_product, sales_report_for_product, ad_performance_for_product, get_product_recommendations_for_product
 
 urlpatterns = [
     # Quản lý đơn hàng
@@ -18,10 +18,20 @@ urlpatterns = [
     path('seller/notifications/<int:seller_id>/', get_notifications, name='get_notifications'),
     path('seller/comments/<int:seller_id>/', get_comments, name='get_comments'),
 
+    # Thông báo và phản hồi của người dùng theo sản phẩm
+    path('seller/<int:seller_id>/comments/<int:product_id>/', get_comments_for_product, name='get_comments_for_product'),
+
     # Báo cáo và thống kê
     path('seller/sales_report/<int:seller_id>/', sales_report, name='sales_report'),
     path('seller/ad_performance/<int:seller_id>/', ad_performance, name='ad_performance'),
 
+    # Báo cáo và thống kê theo sản phẩm
+    path('seller/<int:seller_id>/sales_report/<int:product_id>/', sales_report_for_product, name='sales_report_for_product'),
+    path('seller/<int:seller_id>/ad_performance/<int:product_id>/', ad_performance_for_product, name='ad_performance_for_product'),
+    
     # Quản lý khuyến nghị sản phẩm
     path('seller/product_recommendations/<int:seller_id>/', get_product_recommendations, name='get_product_recommendations'),
+    
+    # Khuyến nghị sản phẩm theo sản phẩm cụ thể
+    path('seller/<int:seller_id>/product_recommendations/<int:product_id>/', get_product_recommendations_for_product, name='get_product_recommendations_for_product'),
 ]
