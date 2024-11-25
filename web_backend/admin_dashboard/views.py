@@ -10,9 +10,11 @@ from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
 from users.models import User
 from products.models import Category
+from orders.models import Order
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
 from products.serializers import CategorySerializer
+from orders.serializers import OrderSerializer
 from seller_dashboard.serializers import AdSerializer
 from users.decorators import admin_required
 
@@ -201,3 +203,103 @@ def delete_category(request, category_id):
         return Response({'message': 'Category deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Lấy danh sách đơn hàng
+@api_view(['GET'])
+@admin_required
+def get_orders(request):
+    orders = Order.objects.all().order_by('-created_at')  # Sắp xếp theo ngày tạo
+    serialized_data = OrderSerializer(orders, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Tìm kiếm đơn hàng
+@api_view(['GET'])
+@admin_required
+def search_orders(request):
+    query = request.query_params.get('query', '').strip()
+
+    if not query:
+        return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Tìm kiếm theo ID đơn hàng, username người dùng, hoặc trạng thái đơn hàng
+    orders = Order.objects.filter(
+        Q(order_id__icontains=query) |
+        Q(user__username__icontains=query) |
+        Q(status__icontains=query)
+    ).distinct().order_by('-created_at')
+
+    if orders.exists():
+        serialized_data = OrderSerializer(orders, many=True).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+
+    return Response({'message': 'No orders found matching the query'}, status=status.HTTP_404_NOT_FOUND)
+
+# API chi tiết đơn hàng
+@api_view(['GET'])
+@admin_required
+def get_order_detail(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        serialized_data = OrderSerializer(order).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# API Cập nhật trạng thái đơn hàng
+@api_view(['PUT'])
+@admin_required
+def update_order_status(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = new_status
+        order.save()
+        return Response({'message': 'Order status updated successfully'}, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# API Xóa đơn hàng
+@api_view(['DELETE'])
+@admin_required
+def delete_order(request, order_id):
+    try:
+        order = Order.objects.get(order_id=order_id)
+        order.delete()
+        return Response({'message': 'Order deleted successfully'}, status=status.HTTP_200_OK)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Lấy danh sách hành vi duyệt web
+@api_view(['GET'])
+@admin_required
+def get_user_browsing_behaviors(request):
+    behaviors = UserBrowsingBehavior.objects.all()
+    serialized_data = UserBrowsingBehaviorSerializer(behaviors, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Lấy chi tiết hành vi duyệt web
+@api_view(['GET'])
+@admin_required
+def get_user_browsing_behavior_detail(request, behavior_id):
+    try:
+        behavior = UserBrowsingBehavior.objects.get(behavior_id=behavior_id)
+        serialized_data = UserBrowsingBehaviorSerializer(behavior).data
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    except UserBrowsingBehavior.DoesNotExist:
+        return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Xóa hành vi duyệt web
+@api_view(['DELETE'])
+@admin_required
+def delete_user_browsing_behavior(request, behavior_id):
+    try:
+        behavior = UserBrowsingBehavior.objects.get(behavior_id=behavior_id)
+        behavior.delete()
+        return Response({'message': 'Browsing behavior deleted successfully'}, status=status.HTTP_200_OK)
+    except UserBrowsingBehavior.DoesNotExist:
+        return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
