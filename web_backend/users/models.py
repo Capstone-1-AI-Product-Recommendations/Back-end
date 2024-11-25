@@ -18,6 +18,7 @@ class User(models.Model):
     email = models.CharField(unique=True, max_length=100)
     full_name = models.CharField(max_length=100, blank=True, null=True)
     role = models.ForeignKey('Role', models.DO_NOTHING, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
