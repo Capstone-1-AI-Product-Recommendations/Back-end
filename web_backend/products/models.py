@@ -1,3 +1,2 @@
 from django.db import models
-
-# Create your models here.
+from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
