@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from rest_framework import status
 from django.db.models import Q
+from datetime import datetime, timedelta
 from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
 from users.models import User
@@ -303,3 +304,96 @@ def delete_user_browsing_behavior(request, behavior_id):
         return Response({'message': 'Browsing behavior deleted successfully'}, status=status.HTTP_200_OK)
     except UserBrowsingBehavior.DoesNotExist:
         return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# API Hiển thị khách hàng hiện tại
+@api_view(['GET'])
+@admin_required
+def get_current_customers(request):
+    customers = User.objects.filter(order__isnull=False).distinct()  # Khách hàng có đơn hàng
+    serialized_data = UserSerializer(customers, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Hiển thị khách hàng mới
+@api_view(['GET'])
+@admin_required
+def get_new_customers(request):
+    customers = User.objects.filter(order__isnull=True).order_by('-created_at')  # Chưa có đơn hàng, sắp xếp theo thời gian tạo
+    serialized_data = UserSerializer(customers, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# API Hiển thị khách hàng mục tiêu
+@api_view(['GET'])
+@admin_required
+def get_target_customers(request):
+    # Lấy danh sách người dùng có hành vi duyệt web hoặc xem quảng cáo
+    customers = User.objects.filter(
+        Q(userbrowsingbehavior__isnull=False) |  # Có hành vi duyệt web
+        Q(adview__isnull=False)  # Xem quảng cáo
+    ).distinct()
+    serialized_data = UserSerializer(customers, many=True).data
+    return Response(serialized_data, status=status.HTTP_200_OK)
+
+# Hàm tính toán khoảng thời gian
+def get_time_range(period):
+    now = datetime.now()
+    if period == 'day':
+        start_time = now - timedelta(days=1)
+    elif period == 'week':
+        start_time = now - timedelta(weeks=1)
+    elif period == 'month':
+        start_time = now - timedelta(days=30)
+    elif period == 'quarter':  # 3 tháng = 90 ngày
+        start_time = now - timedelta(days=90)
+    else:
+        raise ValueError("Invalid period. Use 'day', 'week', 'month', or 'quarter'.")
+    return start_time, now
+
+# API Tổng doanh số, lợi nhuận, doanh thu
+@api_view(['GET'])
+@admin_required
+def get_sales_data(request, period):
+    try:
+        start_time, end_time = get_time_range(period)
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Tổng doanh số
+    total_sales = OrderItem.objects.filter(order__created_at__range=(start_time, end_time)).aggregate(
+        total_quantity=Sum('quantity')
+    )['total_quantity'] or 0
+
+    # Tổng lợi nhuận
+    total_profit = OrderItem.objects.filter(order__created_at__range=(start_time, end_time)).aggregate(
+        profit=Sum(F('price') - F('cost_price'))  # Giá bán - Giá vốn
+    )['profit'] or 0
+
+    # Tổng doanh thu
+    total_revenue = Order.objects.filter(created_at__range=(start_time, end_time)).aggregate(
+        revenue=Sum('total_price')
+    )['revenue'] or 0
+
+    data = {
+        "period": period,
+        "total_sales": total_sales,
+        "total_profit": total_profit,
+        "total_revenue": total_revenue,
+    }
+    return Response(data, status=status.HTTP_200_OK)
+
+# API Khách hàng mới
+@api_view(['GET'])
+@admin_required
+def get_new_customers(request, period):
+    try:
+        start_time, end_time = get_time_range(period)
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Đếm số lượng khách hàng mới
+    new_customers_count = User.objects.filter(created_at__range=(start_time, end_time)).count()
+
+    data = {
+        "period": period,
+        "new_customers": new_customers_count,
+    }
+    return Response(data, status=status.HTTP_200_OK)

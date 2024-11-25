@@ -29,4 +29,11 @@ urlpatterns = [
     path('browsing-behaviors/', views.get_user_browsing_behaviors, name='get_user_browsing_behaviors'), # API Lấy danh sách hành vi duyệt web
     path('browsing-behaviors/<int:behavior_id>/', views.get_user_browsing_behavior_detail, name='get_user_browsing_behavior_detail'), # API Lấy chi tiết hành vi duyệt web
     path('browsing-behaviors/<int:behavior_id>/delete/', views.delete_user_browsing_behavior, name='delete_user_browsing_behavior'), # API Xóa hành vi duyệt web
+
+    path('customers/current/', views.get_current_customers, name='get_current_customers'),  # API Khách hàng hiện tại
+    path('customers/new/', views.get_new_customers, name='get_new_customers'),  # API Khách hàng mới
+    path('customers/target/', views.get_target_customers, name='get_target_customers'),  # API Khách hàng mục tiêu
+
+    path('stats/sales/<str:period>/', views.get_sales_data, name='get_sales_data'), # API Tổng doanh số, lợi nhuận, doanh thu
+    path('stats/new-customers/<str:period>/', views.get_new_customers, name='get_new_customers'), # API Khách hàng mới
 ]
