@@ -1,7 +1,7 @@
 from time import time
 import uuid, json, hmac, hashlib, urllib.request, random
 from datetime import datetime
-# import requests
+import requests
 from rest_framework import status
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
@@ -115,7 +115,7 @@ def zalopay_payment(request, order_id):
 
 @csrf_exempt
 @api_view(['POST'])
-def payment_callback(request):
+def zalopay_callback(request):
     try:
         # Lấy dữ liệu callback từ ZaloPay
         cbdata = request.data
