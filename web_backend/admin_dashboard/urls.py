@@ -36,4 +36,7 @@ urlpatterns = [
 
     path('stats/sales/<str:period>/', views.get_sales_data, name='get_sales_data'), # API Tổng doanh số, lợi nhuận, doanh thu
     path('stats/new-customers/<str:period>/', views.get_new_customers, name='get_new_customers'), # API Khách hàng mới
+
+    path('admin/info/', views.get_admin_info, name='get_admin_info'),# API lấy thông tin admin
+    path('admin/info/<int:admin_id>/', views.update_admin_info, name='update_admin_info'),#
 ]

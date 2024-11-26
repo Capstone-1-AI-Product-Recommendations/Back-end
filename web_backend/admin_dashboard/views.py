@@ -397,3 +397,63 @@ def get_new_customers(request, period):
         "new_customers": new_customers_count,
     }
     return Response(data, status=status.HTTP_200_OK)
+
+# API lấy thông tin admin
+@api_view(['GET'])
+@admin_required
+def get_admin_info(request):
+    try:
+        admin_role = Role.objects.get(name='admin')  # Vai trò admin
+        admins = User.objects.filter(role=admin_role)
+
+        data = [
+            {
+                "user_id": admin.user_id,
+                "username": admin.username,
+                "email": admin.email,
+                "full_name": admin.full_name,
+                "created_at": admin.created_at,
+            }
+            for admin in admins
+        ]
+
+        return Response({"admins": data}, status=status.HTTP_200_OK)
+
+    except Role.DoesNotExist:
+        return Response({"error": "Admin role not found"}, status=status.HTTP_404_NOT_FOUND)
+
+# API chỉnh sửa thông tin admin
+@api_view(['PUT'])
+@admin_required
+def update_admin_info(request, admin_id):
+    try:
+        admin_role = Role.objects.get(name='admin')
+        admin_user = User.objects.get(user_id=admin_id, role=admin_role)
+    except Role.DoesNotExist:
+        return Response({"error": "Admin role not found"}, status=status.HTTP_404_NOT_FOUND)
+    except User.DoesNotExist:
+        return Response({"error": "Admin user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy dữ liệu từ request
+    data = request.data
+    allowed_fields = ['username', 'email', 'full_name']
+
+    for field in allowed_fields:
+        if field in data:
+            setattr(admin_user, field, data[field])
+
+    # Lưu thông tin
+    admin_user.save()
+
+    return Response(
+        {
+            "message": "Admin information updated successfully",
+            "admin": {
+                "user_id": admin_user.user_id,
+                "username": admin_user.username,
+                "email": admin_user.email,
+                "full_name": admin_user.full_name,
+            }
+        },
+        status=status.HTTP_200_OK
+    )
