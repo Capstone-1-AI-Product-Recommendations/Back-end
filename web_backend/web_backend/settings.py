@@ -245,9 +245,3 @@ EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
 
-VNPay_CONFIG = {
-    'vnp_TmnCode': 'YourTmnCode',
-    'vnp_HashSecret': 'YourHashSecret',
-    'vnp_Url': 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',  
-    'vnp_ReturnUrl': 'http://yourdomain.com/payment/return/',  
-}

@@ -2,8 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.contrib.auth import logout
-from .serializer import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer
-from web_backend.models import Role, User, UserBankAccount
+from .serializer import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
+from web_backend.models import Role, User, UserBankAccount,UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt, requests
@@ -12,7 +12,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import redirect
-
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 @csrf_exempt
 @api_view(['POST'])
@@ -20,6 +21,16 @@ def register(request):
     if request.method == 'POST':
         serializer = UserSerializer(data=request.data)  # Khởi tạo serializer với dữ liệu yêu cầu        
         if serializer.is_valid():
+            # Kiểm tra email
+            email = serializer.validated_data.get('email')
+            try:
+                validate_email(email)  # Kiểm tra định dạng email
+            except ValidationError:
+                return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Kiểm tra xem email đã tồn tại chưa
+            if User.objects.filter(email=email).exists():
+                return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
             # Xử lý mật khẩu
             password = serializer.validated_data.get('password')
             if password:
@@ -37,13 +48,17 @@ def register(request):
             user.save()
             # Gửi email xác thực
             verification_link = f"http://127.0.0.1:8000/api/verify_email/?token={verification_token}"
-            send_mail(
-                subject="Verify Your Email",
-                message=f"Hi {user.username},\n\nPlease verify your email by clicking the link below:\n{verification_link}\n\nThank you!",
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
+            try:
+                send_mail(
+                    subject="Verify Your Email",
+                    message=f"Hi {user.username},\n\nPlease verify your email by clicking the link below:\n{verification_link}\n\nThank you!",
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                user.delete()  # Xóa người dùng nếu gửi email thất bại
+                return Response({"error": f"Failed to send verification email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response(
                 {"message": "User registered successfully. A verification email has been sent to your email address."},
                 status=status.HTTP_201_CREATED
@@ -100,7 +115,6 @@ def logout_view(request):
         response.delete_cookie('user_token')  # Xóa cookie chứa token khi logout
         return response
     return Response({"error": "User not authenticated"}, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 def GoogleSignUpView(request):
@@ -231,6 +245,15 @@ def update_user(request):
         fields_to_update = ['full_name', 'email', 'phone_number', 'address']
         for field in fields_to_update:
             if field in request.data:
+                if field == 'email':  # Kiểm tra email
+                    email = request.data[field]
+                    try:
+                        validate_email(email)  # Kiểm tra định dạng email
+                    except ValidationError:
+                        return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+                    # Kiểm tra xem email đã được sử dụng chưa
+                    if User.objects.filter(email=email).exclude(user_id=user_id).exists():
+                        return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
                 setattr(user, field, request.data[field])
         # Lưu các thay đổi vào cơ sở dữ liệu
         user.save()
@@ -297,3 +320,11 @@ def delete_user_bank_account(request, bank_account_id):
 
     bank_account.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+def get_user_behavior(request, user_id):
+    behaviors = UserBrowsingBehavior.objects.filter(user_id=user_id).order_by('-timestamp')
+    if behaviors.exists():
+        serializer = UserBrowsingBehaviorSerializer(behaviors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response({"detail": "No browsing behavior found for this user."}, status=status.HTTP_404_NOT_FOUND)

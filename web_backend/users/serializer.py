@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from web_backend.models import Role, User, UserBankAccount
+from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,3 +46,7 @@ class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
     password = serializers.CharField(required=True, write_only=True)
 
+class UserBrowsingBehaviorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBrowsingBehavior
+        fields = '__all__'
