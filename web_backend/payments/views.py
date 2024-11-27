@@ -80,18 +80,13 @@ def zalopay_payment(request, order_id):
             ]),
             "embeddata": json.dumps({"merchantinfo": "embeddata123"})
         }
-
         # Tạo mac
-        mac_data = "{}|{}|{}|{}|{}|{}|{}".format(data["appid"], data["apptransid"], data["appuser"],
-                                                 data["amount"], data["apptime"], data["embeddata"], data["item"])
+        mac_data = "{}|{}|{}|{}|{}|{}|{}".format(data["appid"], data["apptransid"], data["appuser"], data["amount"], data["apptime"], data["embeddata"], data["item"])
         data["mac"] = hmac.new(config['key1'].encode(), mac_data.encode(), hashlib.sha256).hexdigest()
-
         # Gửi yêu cầu thanh toán đến ZaloPay
         response = requests.post(config["endpoint"], data=data)
         print("Response from ZaloPay:", response.text)  # Kiểm tra phản hồi
-
         result = response.json()
-
         # Kiểm tra kết quả từ ZaloPay
         if result.get("returncode") == 1:
             # Lưu thông tin thanh toán vào database 
@@ -104,7 +99,6 @@ def zalopay_payment(request, order_id):
                 transaction_id=data["apptransid"]
             )
             payment.save()
-
             return Response({"order_url": result.get("orderurl")}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Lỗi khi tạo đơn thanh toán"}, status=status.HTTP_400_BAD_REQUEST)

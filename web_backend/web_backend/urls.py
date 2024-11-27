@@ -30,6 +30,11 @@ urlpatterns = [
    path('api/', include('payments.urls')),
    path('api/', include('carts.urls')),
    path('api/', include('seller_dashboard.urls')),
+   path('products/', include('products.urls')),
+   path('recommendations/', include('recommendations.urls')),
+   path('seller_dashboard/', include('seller_dashboard.urls')), #URL cho seller
+   path('admin_dashboard/', include('admin_dashboard.urls')),  #URL cho admin
+   path('users/', include('users.urls')),  #URL cho phân quyền người dùng
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

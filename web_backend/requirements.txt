@@ -31,7 +31,9 @@ urllib3
 cloudinary
 Pillow
 ffmpeg-python
-django-cloudinary-storage Pillow moviepy
+django-cloudinary-storage 
+Pillow 
+moviepy
 ffmpeg
 moviepy[optional]
 scipy

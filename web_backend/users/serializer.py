@@ -29,7 +29,6 @@ class UserBankAccountSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
-
 class UserSerializer(serializers.ModelSerializer):
     role = RoleSerializer(required=False, allow_null=True)
     bank_accounts = UserBankAccountSerializer(many=True, read_only=True, source='userbankaccount_set')
