@@ -6,3 +6,11 @@ urlpatterns = [
     path('payments/zalopay/<int:order_id>/', zalopay_payment, name='zalopay_payment'),
     path('payments/zalopay_callback/<int:order_id>/', payment_callback, name='payment_callback'),
 ]
+
+# # payments/urls.py
+# from django.urls import path
+# from . import views
+#
+# urlpatterns = [
+#
+# ]

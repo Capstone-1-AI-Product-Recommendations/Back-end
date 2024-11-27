@@ -31,6 +31,7 @@ SITE_ID = 1
 # Application definition
 
 INSTALLED_APPS = [
+    "rest_framework",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -45,8 +46,7 @@ INSTALLED_APPS = [
     'payments',
     'recommendations',
     'seller_dashboard',
-    'django.contrib.sites',       
-    'rest_framework',
+    'django.contrib.sites',           
     'rest_framework.authtoken',
     'dj_rest_auth',
     "dj_rest_auth.registration",
@@ -58,7 +58,7 @@ INSTALLED_APPS = [
     "web_backend",
     'corsheaders',
     'cloudinary',
-    'cloudinary_storage',
+    'cloudinary_storage',    
 ]
 
 MIDDLEWARE = [
@@ -72,6 +72,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ]
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = "web_backend.urls"
 
@@ -137,10 +138,10 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone_1',
+        'NAME': 'capstone1',
         'USER': 'root',
         'PASSWORD': '12345',
-        'HOST': 'localhost', 
+        'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
             'charset': 'utf8mb4',

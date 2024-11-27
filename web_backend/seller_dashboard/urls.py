@@ -1,5 +1,7 @@
 from django.urls import path
 from .views import get_orders, get_order_details, create_ad, update_ad, get_seller_profile, update_seller_profile, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report, get_comments_for_product, sales_report_for_product, ad_performance_for_product, get_product_recommendations_for_product
+# seller_dashboard/urls.py
+from . import views
 
 urlpatterns = [
     # Quản lý đơn hàng
@@ -34,4 +36,8 @@ urlpatterns = [
     
     # Khuyến nghị sản phẩm theo sản phẩm cụ thể
     path('seller/<int:seller_id>/product_recommendations/<int:product_id>/', get_product_recommendations_for_product, name='get_product_recommendations_for_product'),
+
+    path('ads/', views.get_ads, name='ads'), # API lấy danh sách quảng cáo
+    path('ads/create/', views.create_ad, name='create_ad'),  # API tạo quảng cáo
+    path('ads/homepage-banners/', views.get_homepage_banners, name='get_homepage_banners'),  # API quảng cáo homepage
 ]
