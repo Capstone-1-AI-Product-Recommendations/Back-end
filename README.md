@@ -2,6 +2,8 @@ download python version 3.9.13
 
 python -m venv myenv
 
+git fetch origin chinhh
+
 myenv\Scripts\activate
 
 python.exe -m pip install --upgrade pip
