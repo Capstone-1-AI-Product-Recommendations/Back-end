@@ -1,8 +1,27 @@
 from django.urls import path
-from .views import get_users, create_user, user_detail
+from .views import product_detail, create_product, update_product, delete_product
+from . import views
 
 urlpatterns = [
-    path('users/', get_users, name='get_users'),
-    path('users/create', create_user, name='create_user'),
-    path('users/<int:pk>', user_detail, name='user_detail'),
+    path('products/detail/<int:product_id>/', product_detail, name='product_detail'),
+    path('products/create_product/', create_product, name='create_product'),
+    path('products/update_product/<int:product_id>/', update_product, name='update_product'),
+    path('products/delete_product/<int:product_id>/', delete_product, name='delete_product'),
+    path('featured/', views.get_featured_products, name='featured_products'),
+    path('trending/', views.get_trending_products, name='trending_products'),
+    path('random/', views.get_random_products, name='random_products'),
+    path('popular-categories/', views.get_popular_categories, name='popular_categories'),
+    path('all-categories/', views.get_all_categories, name='all_categories'),
+    path('latest-comments/', views.get_latest_comments, name='latest_comments'),
+
+    # Filter APIs
+    path('filter/category/', views.filter_by_category, name='filter_by_category'),
+    path('filter/price/', views.filter_by_price, name='filter_by_price'),
+    path('filter/color/', views.filter_by_color, name='filter_by_color'),
+    path('filter/brand/', views.filter_by_brand, name='filter_by_brand'),
+    path('filter/stock-status/', views.filter_by_stock_status, name='filter_by_stock_status'),
+
+    # Search and filter page API
+    path('filter/', views.filter_page, name='filter_page'),
+    path('search/', views.filter_page, name='search_products'),
 ]
