@@ -1,9 +1,12 @@
-# products/urls.py
-
 from django.urls import path
+from .views import product_detail, create_product, update_product, delete_product
 from . import views
 
 urlpatterns = [
+    path('products/detail/<int:product_id>/', product_detail, name='product_detail'),
+    path('products/create_product/', create_product, name='create_product'),
+    path('products/update_product/<int:product_id>/', update_product, name='update_product'),
+    path('products/delete_product/<int:product_id>/', delete_product, name='delete_product'),
     path('featured/', views.get_featured_products, name='featured_products'),
     path('trending/', views.get_trending_products, name='trending_products'),
     path('random/', views.get_random_products, name='random_products'),

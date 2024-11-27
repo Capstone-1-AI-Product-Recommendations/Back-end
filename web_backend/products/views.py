@@ -1,14 +1,66 @@
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.response import Response
+from rest_framework import status
+from web_backend.models import Product
+from .serializer import ProductSerializer, CRUDProductSerializer
+# from django.db.models import Prefetch
 from django.shortcuts import render
 from .models import Product, Category, Comment, User
 from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
 from users.serializers import UserSerializer
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from django.db.models import Count, Q
 import requests
 import random
 from django.urls import reverse
 
+@api_view(['GET'])
+def product_detail(request, product_id):
+    try:
+        product = Product.objects.select_related('category', 'seller') \
+                                  .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set') \
+                                  .get(product_id=product_id)
+    except Product.DoesNotExist:
+        return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ProductSerializer(product)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def create_product(request):
+    serializer = CRUDProductSerializer(data=request.data)
+    if serializer.is_valid():
+        product = serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PUT'])
+@parser_classes([MultiPartParser, FormParser])
+def update_product(request, product_id):
+    try:
+        product = Product.objects.get(pk=product_id)
+    except Product.DoesNotExist:
+        return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = CRUDProductSerializer(product, data=request.data, partial=True)
+    if serializer.is_valid():
+        updated_product = serializer.save()
+        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+def delete_product(request, product_id):
+    try:
+        product = Product.objects.get(pk=product_id)
+    except Product.DoesNotExist:
+        return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    product.delete()
+    return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+# BASE_URL = 'http://localhost:8000'
 
 # API để lấy 6 sản phẩm nổi bật
 @api_view(['GET'])
@@ -36,6 +88,7 @@ def get_random_products(request):
     )
     random_products = Product.objects.filter(product_id__in=random_ids)
     serialized_data = ProductSerializer(random_products, many=True).data
+    print(serialized_data)
     return Response(serialized_data)
 
 # API để lấy danh mục phổ biến
@@ -64,7 +117,18 @@ def get_latest_comments(request):
 # Tổng hợp API cho trang chủ
 @api_view(['GET'])
 def homepage_api(request):
+    # BASE_URL = request.build_absolute_uri('/')[:-1]    
+    # featured_products = requests.get(f'{BASE_URL}/products/featured/').json()
+    # trending_products = requests.get(f'{BASE_URL}/products/trending/').json()
+    # random_products = requests.get(f'{BASE_URL}/products/random/').json()
+    # recommended_products = requests.get(f'{BASE_URL}/recommendations/recommended/').json() if request.user.is_authenticated else []
+    # popular_categories = requests.get(f'{BASE_URL}/products/popular-categories/').json()
+    # latest_comments = requests.get(f'{BASE_URL}/products/latest-comments/').json()
+    # ads = requests.get(f'{BASE_URL}/seller_dashboard/ads/').json()
+    # all_categories = requests.get(f'{BASE_URL}/products/all-categories/').json()
+    
     base_url = request.build_absolute_uri('/')[:-1]  # Lấy url cơ sở chủ động
+
 
     featured_products = requests.get(base_url + reverse('featured_products')).json()
     trending_products = requests.get(base_url + reverse('trending_products')).json()

@@ -1,4 +1,5 @@
 from django.db import models
+from web_backend.models import Role, User, UserBankAccount
 from django.contrib.auth.models import User
 
 # Create your models here.
@@ -25,3 +26,4 @@ class User(models.Model):
     class Meta:
         managed = False
         db_table = 'user'
+

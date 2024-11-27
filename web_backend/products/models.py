@@ -1,4 +1,5 @@
 from django.db import models
+from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
 from django.contrib.auth.models import User
 
 # Create your models here.
