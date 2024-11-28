@@ -18,9 +18,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAdminUser
 
-from .decorators import admin_required
-from .models import User, Role
-from .serializers import UserSerializer
+# from .decorators import admin_required
+# from .models import User, Role
+# from .serializers import UserSerializer
 
 @csrf_exempt
 @api_view(['POST'])

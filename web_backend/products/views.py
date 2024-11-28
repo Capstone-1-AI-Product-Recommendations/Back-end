@@ -2,12 +2,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Product
+from web_backend.models import Product, User
 from .serializer import ProductSerializer, CRUDProductSerializer
-# from django.db.models import Prefetch
+from django.db.models import Prefetch
 from django.shortcuts import render
-from .models import Product, Category, Comment, User
-from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
+# from .models import Product, Category, Comment, User
+# from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
 from users.serializers import UserSerializer
 from rest_framework.decorators import api_view
 from django.db.models import Count, Q
@@ -16,11 +16,11 @@ import random
 from django.urls import reverse
 
 @api_view(['GET'])
-def product_detail(request, product_id):
+def product_detail(request, user_id, product_id):
     try:
         product = Product.objects.select_related('category', 'seller') \
                                   .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set') \
-                                  .get(product_id=product_id)
+                                  .get(product_id=product_id)        
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -29,20 +29,35 @@ def product_detail(request, product_id):
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
-def create_product(request):
+def create_product(request, seller_id):
+    try:
+        seller = User.objects.get(user_id=seller_id)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Thêm seller vào validated_data trước khi tạo sản phẩm
+    request.data['seller'] = seller_id  # Truyền seller_id vào request data
+
     serializer = CRUDProductSerializer(data=request.data)
     if serializer.is_valid():
-        product = serializer.save()
+        product = serializer.save(seller=seller)  # Gán seller khi tạo sản phẩm
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
 @parser_classes([MultiPartParser, FormParser])
-def update_product(request, product_id):
+def update_product(request, seller_id, product_id):   
+    # Kiểm tra xem seller_id có hợp lệ không
+    try:
+        seller = User.objects.get(user_id=seller_id)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
     try:
         product = Product.objects.get(pk=product_id)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+    # Cập nhật seller trong request data
+    request.data['seller'] = seller_id  # Truyền seller_id vào request data
 
     serializer = CRUDProductSerializer(product, data=request.data, partial=True)
     if serializer.is_valid():
@@ -51,14 +66,21 @@ def update_product(request, product_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-def delete_product(request, product_id):
+def delete_product(request, product_id, seller_id):
     try:
+        # Lấy sản phẩm từ database
         product = Product.objects.get(pk=product_id)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-
+    
+    # Kiểm tra xem seller_id có đúng là seller của sản phẩm hay không
+    if product.seller.pk != seller_id:
+        return Response({"detail": "You are not authorized to delete this product."}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Nếu là seller đúng, xóa sản phẩm
     product.delete()
     return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
 
 # BASE_URL = 'http://localhost:8000'
 

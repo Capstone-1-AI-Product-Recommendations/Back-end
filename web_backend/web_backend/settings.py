@@ -71,6 +71,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     'allauth.account.middleware.AccountMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'web_backend.middleware.UserActivityLoggerMiddleware',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 

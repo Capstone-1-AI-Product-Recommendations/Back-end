@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo
+from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User
 from cloudinary.uploader import upload as cloudinary_upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 import requests
@@ -43,6 +43,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'quantity', 'recommendations', 'ads', 'comments'
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
+    seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=True)
     images = serializers.ListField(
         child=serializers.ImageField(), write_only=True, required=False
     )
@@ -82,18 +83,24 @@ class CRUDProductSerializer(serializers.ModelSerializer):
 
         # Xử lý ảnh và upload lên Cloudinary
         if images:
-            instance.images.all().delete()
+            instance.images.all().delete()  # Xóa các ảnh cũ
             for image in images:
-                compressed_image = compress_and_upload_image(image)
-                cloudinary_response = upload(compressed_image, folder='products/images/')
-                ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
+                try:
+                    compressed_image = compress_and_upload_image(image)
+                    cloudinary_response = cloudinary_upload(compressed_image, folder='products/images/')
+                    ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
+                except Exception as e:
+                    return Response({"detail": f"Error uploading image: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Xử lý video và upload lên Cloudinary
         if videos:
-            instance.videos.all().delete()
+            instance.videos.all().delete()  # Xóa các video cũ
             for video in videos:
-                compressed_video = compress_and_upload_video(video)
-                cloudinary_response = upload(compressed_video, resource_type="video", folder='products/videos/')
-                ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
+                try:
+                    compressed_video = compress_and_upload_video(video)
+                    cloudinary_response = cloudinary_upload(compressed_video, resource_type="video", folder='products/videos/')
+                    ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
+                except Exception as e:
+                    return Response({"detail": f"Error uploading video: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         return instance
