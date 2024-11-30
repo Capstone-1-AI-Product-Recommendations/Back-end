@@ -1,15 +1,5 @@
 from django.db import models
-from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
-from django.contrib.auth.models import User
-# Create your models here.
-class ProductAd(models.Model):
-    product_ad_id = models.AutoField(primary_key=True)
-    product = models.ForeignKey('products.Product', models.DO_NOTHING)
-    ad = models.ForeignKey('Ad', models.DO_NOTHING)
-
-    class Meta:
-        managed = False
-        db_table = 'product_ad'
+from users.models import User
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -18,19 +8,49 @@ class Ad(models.Model):
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = 'ad'
+
 
 class AdView(models.Model):
     ad_view_id = models.AutoField(primary_key=True)
-    ad = models.ForeignKey('Ad', models.DO_NOTHING)
-    user = models.ForeignKey('users.User', models.DO_NOTHING)
-    viewed_at = models.DateTimeField(blank=True, null=True)
+    viewed_at = models.DateTimeField(auto_now_add=True)
+    ad = models.ForeignKey(Ad, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:
-        managed = False
         db_table = 'ad_view'
+
+
+class SellerProfile(models.Model):
+    seller_id = models.CharField(primary_key=True, max_length=50)
+    store_name = models.CharField(max_length=255, blank=True, null=True)
+    store_address = models.TextField(blank=True, null=True)
+    user = models.OneToOneField(User, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        db_table = 'seller_profile'
+
+
+class Shop(models.Model):
+    shop_id = models.AutoField(primary_key=True)
+    shop_name = models.CharField(max_length=255)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING, blank=True, null=True)
+
+    class Meta:
+        db_table = 'shop'
+
+
+class ShopInfo(models.Model):
+    shop_info_id = models.AutoField(primary_key=True)
+    shop = models.ForeignKey(Shop, on_delete=models.DO_NOTHING, blank=True, null=True)
+    product_count = models.IntegerField(blank=True, null=True)
+    followers_count = models.IntegerField(blank=True, null=True)
+    is_following = models.IntegerField(blank=True, null=True)
+    join_date = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'shop_info'

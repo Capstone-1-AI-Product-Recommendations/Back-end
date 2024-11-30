@@ -30,6 +30,12 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 SITE_ID = 1
 # Application definition
 
+STATICFILES_DIRS = [
+    BASE_DIR / "static",  # Thay đổi BASE_DIR thành đúng cấu trúc của bạn nếu cần
+]
+
+STATIC_URL = '/static/'
+
 INSTALLED_APPS = [
     "rest_framework",
     "django.contrib.admin",
@@ -55,7 +61,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google', 
     'social_django',
-    "web_backend",
+    'web_backend',
     'corsheaders',
     'cloudinary',
     'cloudinary_storage',    
@@ -138,9 +144,9 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone1',
+        'NAME': 'capstone_1',
         'USER': 'root',
-        'PASSWORD': '12345',
+        'PASSWORD': 'anhtu123',
         'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
