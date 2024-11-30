@@ -1,8 +1,8 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
-from .serializer import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
-from web_backend.models import Role, User, UserBankAccount,UserBrowsingBehavior
+from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
+from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt, requests
@@ -15,9 +15,8 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import render
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAdminUser
-
+# from rest_framework.views import APIView
+# from rest_framework.permissions import IsAdminUser
 # from .decorators import admin_required
 # from .models import User, Role
 # from .serializers import UserSerializer
@@ -26,7 +25,7 @@ from rest_framework.permissions import IsAdminUser
 @api_view(['POST'])
 def register(request):
     if request.method == 'POST':
-        serializer = UserSerializer(data=request.data)  # Khởi tạo serializer với dữ liệu yêu cầu        
+        serializer = RegisUserSerializer(data=request.data)  # Khởi tạo serializer với dữ liệu yêu cầu        
         if serializer.is_valid():
             # Kiểm tra email
             email = serializer.validated_data.get('email')
@@ -241,10 +240,7 @@ def forgot_password(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(['PUT'])
-def update_user(request):
-    user_id = request.data.get('user_id')  # Lấy `user_id` từ yêu cầu
-    if not user_id:
-        return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+def update_user(request, user_id):
     try:
         # Tìm kiếm người dùng với ID được cung cấp
         user = User.objects.get(user_id=user_id)
@@ -284,49 +280,48 @@ def update_user(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
-def get_user_bank_accounts(request, user_id):
-    # Lấy danh sách tài khoản ngân hàng của người dùng theo user_id
-    bank_accounts = UserBankAccount.objects.filter(user__user_id=user_id)
-    serializer = UserBankAccountSerializer(bank_accounts, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-@api_view(['POST'])
-def create_user_bank_account(request, user_id):
+@api_view(['GET', 'POST'])
+def user_bank_accounts_list_create(request, user_id):
     try:
-        user = User.objects.get(user_id=user_id)
+        user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
-        return Response({'detail': 'Người dùng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = UserBankAccountSerializer(data=request.data, context={'user_id': user_id})  # Truyền user_id vào context
-    if serializer.is_valid():
-        serializer.save()  # Lưu tài khoản ngân hàng
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        accounts = UserBankAccount.objects.filter(user=user)
+        serializer = UserBankAccountSerializer(accounts, many=True)
+        return Response(serializer.data)
 
-@api_view(['PUT'])
-def update_user_bank_account(request, bank_account_id):
+    elif request.method == 'POST':
+        serializer = UserBankAccountSerializer(data=request.data, context={'user': user})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+# Chi tiết, cập nhật hoặc xóa tài khoản ngân hàng
+@api_view(['GET', 'PUT', 'DELETE'])
+def user_bank_account_detail(request, user_id, bank_account_id):
     try:
-        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
-    except UserBankAccount.DoesNotExist:
-        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+        user = User.objects.get(pk=user_id)
+        account = UserBankAccount.objects.get(pk=bank_account_id, user=user)
+    except (User.DoesNotExist, UserBankAccount.DoesNotExist):
+        return Response({"error": "User or Bank Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Cập nhật thông tin tài khoản ngân hàng
-    serializer = UserBankAccountSerializer(bank_account, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()  # Lưu các thay đổi
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        serializer = UserBankAccountSerializer(account)
+        return Response(serializer.data)
 
-@api_view(['DELETE'])
-def delete_user_bank_account(request, bank_account_id):
-    try:
-        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
-    except UserBankAccount.DoesNotExist:
-        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
+    elif request.method == 'PUT':
+        serializer = UserBankAccountSerializer(account, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    bank_account.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    elif request.method == 'DELETE':
+        account.delete()
+        return Response({"message": "Bank account deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 def get_user_behavior(request, user_id):
@@ -337,27 +332,27 @@ def get_user_behavior(request, user_id):
     return Response({"detail": "No browsing behavior found for this user."}, status=status.HTTP_404_NOT_FOUND)
 
 # Admin có thể thay đổi role của người dùng thành "seller" hoặc ngược lại.
-class AdminUserRoleUpdateView(APIView):
-    permission_classes = [IsAdminUser]
+# class AdminUserRoleUpdateView(APIView):
+#     permission_classes = [IsAdminUser]
 
-    def put(self, request, user_id):
-        try:
-            # Tìm người dùng cần cập nhật
-            user = User.objects.get(user_id=user_id)
-            # Kiểm tra Role
-            role_id = request.data.get('role_id')
+#     def put(self, request, user_id):
+#         try:
+#             # Tìm người dùng cần cập nhật
+#             user = User.objects.get(user_id=user_id)
+#             # Kiểm tra Role
+#             role_id = request.data.get('role_id')
 
-            if not role_id:
-                return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-            # Tìm kiếm Role
-            try:
-                role = Role.objects.get(role_id=role_id)
-            except Role.DoesNotExist:
-                return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
-            # Cập nhật vai trò người dùng
-            user.role = role
-            user.save()
-            return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+#             if not role_id:
+#                 return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+#             # Tìm kiếm Role
+#             try:
+#                 role = Role.objects.get(role_id=role_id)
+#             except Role.DoesNotExist:
+#                 return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
+#             # Cập nhật vai trò người dùng
+#             user.role = role
+#             user.save()
+#             return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+#         except User.DoesNotExist:
+#             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)

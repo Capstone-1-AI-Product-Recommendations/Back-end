@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Cart, CartItem, Product
-from .serializer import CartItemSerializer, CartSerializer
+from .serializers import CartItemSerializer, CartSerializer
 # Create your views here.
 
 # Xem tất cả sản phẩm trong giỏ hàng và tổng số tiền

@@ -1,6 +1,5 @@
 from django.utils.timezone import now
-from web_backend.models import UserBrowsingBehavior, Product
-import re
+from .models import UserBrowsingBehavior, Product
 
 class UserActivityLoggerMiddleware:
     def __init__(self, get_response):
@@ -8,34 +7,39 @@ class UserActivityLoggerMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        user = request.user if request.user.is_authenticated else None
-
-        if user:
-            # Ghi nhận lịch sử tìm kiếm
-            if "search" in request.path and request.method == "GET":
-                self.log_activity(user, "search", request.GET.get("q", ""))
-
-            # Ghi nhận lịch sử xem sản phẩm
-            elif re.search(r'products/\d+', request.path) and request.method == "GET":
-                product_id = self.extract_product_id(request.path)
+        
+        if request.user.is_authenticated:
+            user = request.user
+            
+            # Log 'View Product' activity
+            if 'product' in request.path:
+                product_id = request.GET.get('product_id')
                 if product_id:
-                    self.log_activity(user, "view", product_id)
+                    try:
+                        product = Product.objects.get(id=product_id)
+                        UserBrowsingBehavior.objects.create(
+                            user=user,
+                            product=product,
+                            activity_type='viewed_product',
+                            interaction_value=1.0,
+                            timestamp=now(),
+                        )
+                    except Product.DoesNotExist:
+                        pass
 
-            # Ghi nhận lịch sử mua hàng
-            elif "checkout" in request.path and request.method == "POST":
-                product_id = request.POST.get("product_id")
-                self.log_activity(user, "purchase", product_id)
+            # Log 'Add to Cart' activity
+            if 'cart' in request.path and request.method == 'POST':
+                product_id = request.POST.get('product_id')
+                try:
+                    product = Product.objects.get(id=product_id)
+                    UserBrowsingBehavior.objects.create(
+                        user=user,
+                        product=product,
+                        activity_type='added_to_cart',
+                        interaction_value=1.0,
+                        timestamp=now(),
+                    )
+                except Product.DoesNotExist:
+                    pass
 
         return response
-
-    def log_activity(self, user, activity_type, interaction_value):
-        UserBrowsingBehavior.objects.create(
-            user=user,
-            activity_type=activity_type,
-            interaction_value=interaction_value,
-            timestamp=now()
-        )
-
-    def extract_product_id(self, path):
-        match = re.search(r'products/(?P<product_id>\d+)', path)
-        return match.group('product_id') if match else None

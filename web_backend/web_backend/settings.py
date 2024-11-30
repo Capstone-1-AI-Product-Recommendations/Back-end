@@ -55,10 +55,11 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google', 
     'social_django',
-    "web_backend",
+    # "web_backend",
     'corsheaders',
     'cloudinary',
     'cloudinary_storage',    
+    'web_backend.apps.WebBackendConfig',
 ]
 
 MIDDLEWARE = [
@@ -139,13 +140,14 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'web_backend',
+        'NAME': 'capstone_1',
         'USER': 'root',
         'PASSWORD': 'nhc171103',
         'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
             'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
         },
     }
 }
@@ -246,4 +248,3 @@ EMAIL_USE_TLS = True  # Sử dụng TLS
 EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
-

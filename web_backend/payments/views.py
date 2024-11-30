@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from web_backend.models import Payment, Order
-from .serializer import PaymentSerializer
+from .serializers import PaymentSerializer
 from django.utils import timezone
 from django.http import JsonResponse
 # Create your views here.

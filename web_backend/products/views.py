@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Product, User
-from .serializer import ProductSerializer, CRUDProductSerializer
+from .serializers import ProductSerializer, CRUDProductSerializer
 from django.db.models import Prefetch
 from django.shortcuts import render
 # from .models import Product, Category, Comment, User
@@ -34,7 +34,6 @@ def create_product(request, seller_id):
         seller = User.objects.get(user_id=seller_id)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-
     # Thêm seller vào validated_data trước khi tạo sản phẩm
     request.data['seller'] = seller_id  # Truyền seller_id vào request data
 
