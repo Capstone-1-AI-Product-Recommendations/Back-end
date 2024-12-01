@@ -2,15 +2,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
-from .serializer import ProductSerializer, OrderSerializer, OrderItemSerializer, AdSerializer, ProductAdSerializer, SellerProfileSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
-# seller_dashboard/views.py
-from django.shortcuts import render
+from .serializers import ProductSerializer, AdSerializer, ProductAdSerializer, SellerProfileSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
+from orders.serializers import OrderSerializer, OrderItemSerializer
 from django.http import JsonResponse
 from rest_framework import status
 from datetime import date
 from users.decorators import seller_required
-from .serializers import AdSerializer, ProductSerializer, ProductAdSerializer
-from .models import Ad, ProductAd
 from products.models import Product
 
 # Quản lý đơn hàng
@@ -69,10 +66,10 @@ def create_ad(request, seller_id, product_id):
 def update_ad(request, seller_id, ad_id, product_id):
     try:
         # Kiểm tra xem sản phẩm thuộc seller có tồn tại không
-        product = Product.objects.get(product_id=product_id, seller_id=seller_id)        
+        product = Product.objects.get(product_id=product_id, seller_id=seller_id)
         # Kiểm tra xem quảng cáo liên kết với sản phẩm này có tồn tại không
         product_ad = ProductAd.objects.get(product=product, ad_id=ad_id)
-        ad = product_ad.ad  # Truy xuất quảng cáo từ ProductAd        
+        ad = product_ad.ad  # Truy xuất quảng cáo từ ProductAd
     except (Product.DoesNotExist, ProductAd.DoesNotExist):
         return Response(
             {"error": "Ad or product does not exist for this seller."},
@@ -102,11 +99,11 @@ def update_seller_profile(request, seller_id):
     if serializer.is_valid():
         # Cập nhật hồ sơ người bán
         serializer.save()
-        return Response(serializer.data)    
+        return Response(serializer.data)
     # Trả về lỗi nếu dữ liệu không hợp lệ
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Thông báo và Quản lý Phản hồi 
+# Thông báo và Quản lý Phản hồi
 @api_view(['GET'])
 def get_notifications(request, seller_id):
     notifications = Notification.objects.filter(user__seller_profile__user_id=seller_id)
@@ -217,12 +214,12 @@ def get_homepage_banners(request):
             product_ads = ProductAd.objects.filter(ad=ad)
             serialized_product_ads = ProductAdSerializer(product_ads, many=True).data
 
-            # Kết hợp thông tin quảng cáo và sản phẩm liên quan
-            ad_data = AdSerializer(ad).data
-            ad_data['related_products'] = serialized_product_ads  # Thêm sản phẩm liên quan
-            serialized_ads.append(ad_data)
+            # Kết hợp quảng cáo và thông tin sản phẩm liên quan
+            serialized_ads.append({
+                'ad': AdSerializer(ad).data,
+                'related_products': serialized_product_ads
+            })
 
         return Response(serialized_ads, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -4,5 +4,3 @@ from web_backend.models import *
 
 admin.site.register(Order)
 admin.site.register(OrderItem)
-admin.site.register(Cart)
-admin.site.register(CartItem)

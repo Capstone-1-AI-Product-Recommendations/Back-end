@@ -30,21 +30,32 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 SITE_ID = 1
 # Application definition
 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",  # Thay đổi BASE_DIR thành đúng cấu trúc của bạn nếu cần
-]
-
-STATIC_URL = '/static/'
-
 INSTALLED_APPS = [
-    "rest_framework",
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
-    "users",
+    # Django default apps
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django.contrib.sites',  # `sites` app cần trước các app liên quan đến allauth
+
+    # Third-party apps
+    'rest_framework',
+    'rest_framework.authtoken',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',  # Provider cụ thể của allauth
+    'social_django',
+    'corsheaders',
+    'cloudinary',
+    'cloudinary_storage',
+
+    # Custom apps
+    'users',
     'carts',
     'products',
     'admin_dashboard',
@@ -52,20 +63,9 @@ INSTALLED_APPS = [
     'payments',
     'recommendations',
     'seller_dashboard',
-    'django.contrib.sites',           
-    'rest_framework.authtoken',
-    'dj_rest_auth',
-    "dj_rest_auth.registration",
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google', 
-    'social_django',
     'web_backend',
-    'corsheaders',
-    'cloudinary',
-    'cloudinary_storage',    
 ]
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -151,6 +151,7 @@ DATABASES = {
         'PORT': '3306', 
         'OPTIONS': {
             'charset': 'utf8mb4',
+    'init_command': "SET sql_mode='STRICT_TRANS_TABLES', innodb_strict_mode=1;",
         },
     }
 }
@@ -198,9 +199,6 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR,'static')
-]
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')

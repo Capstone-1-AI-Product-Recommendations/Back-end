@@ -10,8 +10,9 @@ class Payment(models.Model):
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, db_column='order_id')  # Trỏ đến cột `order_id` trong bảng `order`
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, db_column='user_id')  # Trỏ đến cột `user_id` trong bảng `user`
 
     class Meta:
-        db_table = 'payment'
+        managed = False  # Django không quản lý bảng này
+        db_table = 'payment'  # Tên bảng trong cơ sở dữ liệu

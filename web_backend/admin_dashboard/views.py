@@ -9,9 +9,11 @@ from django.db.models import Q
 from datetime import datetime, timedelta
 from .models import Notification, UserBrowsingBehavior
 from seller_dashboard.models import Ad
-from users.models import User
+from users.models import User, Role
 from products.models import Category
-from orders.models import Order
+from orders.models import Order, OrderItem
+from django.db.models import Sum
+from django.db.models import F
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
 from products.serializers import CategorySerializer
