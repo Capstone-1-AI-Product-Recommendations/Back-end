@@ -71,12 +71,12 @@ class CommentSerializer(serializers.ModelSerializer):
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['file', 'uploaded_at']
+        fields = ['file']
 class ProductVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVideo
-        fields = ['file', 'uploaded_at']
-class ProductSerializer(serializers.ModelSerializer):
+        fields = ['file']
+class DetailProductSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='category.category_name', allow_null=True)
     seller = serializers.CharField(source='seller.username', read_only=True)
     recommendations = ProductRecommendationSerializer(
@@ -105,6 +105,12 @@ class CRUDProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['name', 'price', 'category', 'description', 'seller', 'quantity', 'images', 'videos']
 
+    def validate(self, attrs):
+        seller = attrs.get('seller')
+        if seller.role.role_name != "Seller":
+            raise serializers.ValidationError("Only sellers can create products.")
+        return attrs
+    
     def create(self, validated_data):
         images = validated_data.pop('images', [])
         videos = validated_data.pop('videos', [])

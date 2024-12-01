@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
-from .models import User, Role
+# from .models import User, Role
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
@@ -21,7 +21,6 @@ class RegisUserSerializer(serializers.ModelSerializer):
     # bank_accounts = UserBankAccountSerializer(many=True, read_only=True, source='userbankaccount_set')
     class Meta:
         model = User
-        # fields = ['user_id', 'username', 'password', 'email']
         fields = ['user_id', 'username', 'password', 'email', 'full_name','address', 'phone_number', 'role', 'bank_accounts', 'created_at', 'updated_at']
         extra_kwargs = {'password': {'write_only': True}}
 

@@ -178,7 +178,7 @@ class OrderItem(models.Model):
     quantity = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     order = models.ForeignKey(Order, models.DO_NOTHING)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
 
     class Meta:
         managed = False
@@ -204,7 +204,7 @@ class Payment(models.Model):
 class ProductAd(models.Model):
     product_ad_id = models.AutoField(primary_key=True)
     ad = models.ForeignKey(Ad, models.DO_NOTHING)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
 
     class Meta:
         managed = False
@@ -214,7 +214,7 @@ class ProductAd(models.Model):
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
 
     class Meta:
         managed = False
@@ -227,8 +227,8 @@ class ProductRecommendation(models.Model):
     recommended_at = models.DateTimeField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:
         managed = False
@@ -238,7 +238,7 @@ class ProductRecommendation(models.Model):
 class ProductVideo(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='videos')
 
     class Meta:
         managed = False
@@ -306,3 +306,13 @@ class UserBrowsingBehavior(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.activity_type} - {self.product.name if self.product else 'Unknown Product'}"
+
+class ShippingAddress(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shipping_address')
+    recipient_name = models.CharField(max_length=255)
+    recipient_phone = models.CharField(max_length=20)
+    recipient_address = models.TextField()
+
+    class Meta:
+        managed = False
+        db_table = 'shipping_address'

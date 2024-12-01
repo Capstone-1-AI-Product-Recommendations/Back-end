@@ -2,12 +2,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Product, User
-from .serializers import ProductSerializer, CRUDProductSerializer
+from web_backend.models import Product, User, Category, Comment
+from .serializers import DetailProductSerializer, CRUDProductSerializer, ProductSerializer, CommentSerializer, CategorySerializer
 from django.db.models import Prefetch
 from django.shortcuts import render
-# from .models import Product, Category, Comment, User
-# from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
 from users.serializers import UserSerializer
 from rest_framework.decorators import api_view
 from django.db.models import Count, Q
@@ -24,7 +22,7 @@ def product_detail(request, user_id, product_id):
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = ProductSerializer(product)
+    serializer = DetailProductSerializer(product)
     return Response(serializer.data)
 
 @api_view(['POST'])
@@ -32,8 +30,11 @@ def product_detail(request, user_id, product_id):
 def create_product(request, seller_id):
     try:
         seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Only sellers can create products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
     # Thêm seller vào validated_data trước khi tạo sản phẩm
     request.data['seller'] = seller_id  # Truyền seller_id vào request data
 

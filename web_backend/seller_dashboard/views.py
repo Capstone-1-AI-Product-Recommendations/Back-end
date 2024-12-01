@@ -10,8 +10,8 @@ from rest_framework import status
 from datetime import date
 from users.decorators import seller_required
 from .serializers import AdSerializer, ProductSerializer, ProductAdSerializer
-from .models import Ad, ProductAd
-from products.models import Product
+# from .models import Ad, ProductAd
+# from products.models import Product
 
 # Quản lý đơn hàng
 @api_view(['GET'])
