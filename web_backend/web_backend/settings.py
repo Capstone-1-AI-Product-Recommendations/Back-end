@@ -32,13 +32,14 @@ SITE_ID = 1
 
 INSTALLED_APPS = [
     # Django default apps
+    # 'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',  # `sites` app cần trước các app liên quan đến allauth
+      # `sites` app cần trước các app liên quan đến allauth
 
     # Third-party apps
     'rest_framework',

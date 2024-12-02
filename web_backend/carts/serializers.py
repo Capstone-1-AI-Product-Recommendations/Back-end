@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from carts.models import Cart, CartItem  # Import các model trong app carts
-from products.models import Product  # Giả sử bạn có model Product trong app products
+# from carts.models import Cart, CartItem  # Import các model trong app carts
+# from products.models import Product  # Giả sử bạn có model Product trong app products
+from web_backend.models import *
 
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name')  # Trích xuất tên sản phẩm từ product

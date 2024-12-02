@@ -145,19 +145,17 @@ class Product(models.Model):
     quantity = models.IntegerField()
     category = models.ForeignKey('Category', on_delete=models.CASCADE, blank=True, null=True)
     subcategory = models.ForeignKey('Subcategory', on_delete=models.CASCADE, blank=True, null=True)
-    seller = models.ForeignKey('User', on_delete=models.CASCADE, blank=True, null=True)
+    seller = models.ForeignKey('SellerProfile', on_delete=models.CASCADE, blank=True, null=True)
     color = models.CharField(max_length=100, blank=True, null=True)
     brand = models.CharField(max_length=100, blank=True, null=True)
-    IN_STOCK = 'in_stock'
-    OUT_OF_STOCK = 'out_of_stock'
-    STOCK_STATUS_CHOICES = [
-        (IN_STOCK, 'In Stock'),
-        (OUT_OF_STOCK, 'Out of Stock'),
-    ]
 
     class Meta:
         managed = False
         db_table = 'product'
+
+    @property
+    def stock_status(self):
+        return 'in_stock' if self.quantity > 0 else 'out_of_stock'
 
 
 class ProductAd(models.Model):
@@ -214,14 +212,17 @@ class Role(models.Model):
 
 
 class SellerProfile(models.Model):
-    seller_id = models.CharField(primary_key=True, max_length=50)
-    store_name = models.CharField(max_length=255, blank=True, null=True)
-    store_address = models.TextField(blank=True, null=True)
-    user = models.OneToOneField('User', models.DO_NOTHING)
+    seller_id = models.CharField(primary_key=True, max_length=50)  # ID người bán
+    store_name = models.CharField(max_length=255, blank=True, null=True)  # Tên cửa hàng
+    store_address = models.TextField(blank=True, null=True)  # Địa chỉ chi tiết của cửa hàng
+    user = models.OneToOneField('User', on_delete=models.DO_NOTHING)  # Liên kết với bảng User
+    city = models.CharField(max_length=100, blank=True, null=True)  # Thành phố của cửa hàng
+    province = models.CharField(max_length=100, blank=True, null=True)  # Tỉnh/Thành phố của cửa hàng
 
     class Meta:
-        managed = False
-        db_table = 'seller_profile'
+        managed = False  # Django không quản lý bảng này
+        db_table = 'seller_profile'  # Tên bảng trong cơ sở dữ liệu
+
 
 
 class Shop(models.Model):

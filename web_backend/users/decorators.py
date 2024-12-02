@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from functools import wraps
-from .models import User
+# from .models import User
+from web_backend.models import *
 
 def admin_required(view_func):
     # Check if user is authenticated and has an 'admin' role

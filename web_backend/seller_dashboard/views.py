@@ -8,7 +8,6 @@ from django.http import JsonResponse
 from rest_framework import status
 from datetime import date
 from users.decorators import seller_required
-from products.models import Product
 
 # Quản lý đơn hàng
 @api_view(['GET'])

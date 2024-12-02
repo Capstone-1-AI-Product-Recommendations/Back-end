@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
+from users.serializers import UserSerializer
 from cloudinary.uploader import upload as cloudinary_upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 from django.core.files.base import ContentFile

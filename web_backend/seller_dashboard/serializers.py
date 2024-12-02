@@ -2,8 +2,9 @@
 
 from admin_dashboard.serializers import NotificationSerializer  # Import đúng từ admin_dashboard
 from rest_framework import serializers
-from .models import Ad, AdView, Shop, ShopInfo, SellerProfile
-from products.models import ProductAd
+# from .models import Ad, AdView, Shop, ShopInfo, SellerProfile
+# from products.models import ProductAd
+from web_backend.models import *
 from products.serializers import ProductSerializer, CommentSerializer
 from users.serializers import UserSerializer
 from recommendations.serializers import ProductRecommendationSerializer

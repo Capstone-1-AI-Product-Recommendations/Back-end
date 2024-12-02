@@ -2,11 +2,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Product, Ad
+# from web_backend.models import Product, Ad
 from .serializers import ProductSerializer, CRUDProductSerializer
 from seller_dashboard.serializers import AdSerializer
 from django.shortcuts import render
-from .models import Product, Category, Comment, User
+# from .models import Product, Category, Comment, User
+from web_backend.models import *
 from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
 from users.serializers import UserSerializer
 from django.db.models import Count
@@ -153,43 +154,52 @@ def homepage_api(request):
 def filter_by_category(request):
     category = request.GET.get('category')
     if category:
-        products = Product.objects.filter(category__category_name=category)
+        products = Product.objects.filter(category__category_name__iexact=category)
         serialized_data = ProductSerializer(products, many=True).data
-        return Response(serialized_data)
+        return Response(serialized_data, status=200)
     return Response({"message": "Category parameter is required"}, status=400)
+
 
 # Bộ lọc theo price
 @api_view(['GET'])
 def filter_by_price(request):
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
-    if min_price and max_price:
-        products = Product.objects.filter(
-            Q(price__gte=min_price) & Q(price__lte=max_price)
-        )
+    try:
+        min_price = float(min_price) if min_price else None
+        max_price = float(max_price) if max_price else None
+    except ValueError:
+        return Response({"message": "Price parameters must be numeric"}, status=400)
+
+    if min_price is not None and max_price is not None:
+        products = Product.objects.filter(price__gte=min_price, price__lte=max_price)
         serialized_data = ProductSerializer(products, many=True).data
-        return Response(serialized_data)
+        return Response(serialized_data, status=200)
+
     return Response({"message": "Both min_price and max_price parameters are required"}, status=400)
+
 
 # Bộ lọc theo color
 @api_view(['GET'])
 def filter_by_color(request):
     color = request.GET.get('color')
     if color:
-        products = Product.objects.filter(color=color)
+        products = Product.objects.filter(color__iexact=color)
         serialized_data = ProductSerializer(products, many=True).data
-        return Response(serialized_data)
+        return Response(serialized_data, status=200)
     return Response({"message": "Color parameter is required"}, status=400)
+
 
 # Bộ lọc theo brand
 @api_view(['GET'])
 def filter_by_brand(request):
     brand = request.GET.get('brand')
     if brand:
-        products = Product.objects.filter(brand=brand)
+        products = Product.objects.filter(brand__iexact=brand)
         serialized_data = ProductSerializer(products, many=True).data
-        return Response(serialized_data)
+        return Response(serialized_data, status=200)
     return Response({"message": "Brand parameter is required"}, status=400)
+
 
 # Bộ lọc theo stock status
 @api_view(['GET'])
@@ -197,14 +207,16 @@ def filter_by_stock_status(request):
     stock_status = request.GET.get('stock_status')
     if stock_status:
         if stock_status == 'in_stock':
-            products = Product.objects.filter(stock_status=Product.IN_STOCK)
-        elif stock_status == 'on_sale':
-            products = Product.objects.filter(stock_status=Product.ON_SALE)
+            products = Product.objects.filter(quantity__gt=0)
+        elif stock_status == 'out_of_stock':
+            products = Product.objects.filter(quantity=0)
         else:
-            return Response({"message": "Invalid stock_status value"}, status=400)
+            return Response({"message": "Invalid stock_status value. Use 'in_stock' or 'out_of_stock'."}, status=400)
+
         serialized_data = ProductSerializer(products, many=True).data
-        return Response(serialized_data)
+        return Response(serialized_data, status=200)
     return Response({"message": "stock_status parameter is required"}, status=400)
+
 
 # Tổng hợp API cho Filter_Page với các bộ lọc
 @api_view(['GET'])
@@ -222,54 +234,55 @@ def filter_page(request):
     # Bộ lọc theo category
     category = request.GET.get('category')
     if category:
-        products = products.filter(category__category_name=category)
+        products = products.filter(category__category_name__iexact=category)
 
     # Bộ lọc theo price
     min_price = request.GET.get('min_price')
     max_price = request.GET.get('max_price')
     if min_price and max_price:
-        products = products.filter(
-            Q(price__gte=min_price) & Q(price__lte=max_price)
-        )
+        try:
+            min_price = float(min_price)
+            max_price = float(max_price)
+            products = products.filter(price__gte=min_price, price__lte=max_price)
+        except ValueError:
+            return Response({"message": "Price parameters must be numeric"}, status=400)
 
     # Bộ lọc theo color
     color = request.GET.get('color')
     if color:
-        products = products.filter(color=color)
+        products = products.filter(color__iexact=color)
 
     # Bộ lọc theo brand
     brand = request.GET.get('brand')
     if brand:
-        products = products.filter(brand=brand)
+        products = products.filter(brand__iexact=brand)
 
     # Bộ lọc theo stock status
     stock_status = request.GET.get('stock_status')
     if stock_status:
         if stock_status == 'in_stock':
-            products = products.filter(stock_status=Product.IN_STOCK)
-        elif stock_status == 'on_sale':
-            products = products.filter(stock_status=Product.ON_SALE)
+            products = products.filter(quantity__gt=0)
+        elif stock_status == 'out_of_stock':
+            products = products.filter(quantity=0)
 
     # Bộ lọc theo city và province
     city = request.GET.get('city')
     province = request.GET.get('province')
     if city:
-        products = products.filter(seller__user__address__icontains=city)  # Assuming 'address' is related to 'User' (seller)
+        products = products.filter(seller__user__sellerprofile__city__icontains=city)
     if province:
-        products = products.filter(seller__user__address__icontains=province)
+        products = products.filter(seller__sellerprofile__province__icontains=province)
 
     # Serialize sản phẩm
     products_serialized = ProductSerializer(products, many=True).data
 
     # Lọc người bán liên quan đến các sản phẩm đã lọc
-    related_sellers = {product['seller']['id'] for product in products_serialized if product['seller']}
-    sellers = User.objects.filter(id__in=related_sellers)
-
-    # Chỉ lấy top 2 người bán
-    top_sellers = sellers[:2]  # Slicing để lấy 2 người bán đầu tiên
-    sellers_serialized = UserSerializer(top_sellers, many=True).data
+    related_sellers_ids = products.values_list('seller_id', flat=True).distinct()
+    sellers = SellerProfile.objects.filter(seller_id__in=related_sellers_ids)[:2]
+    sellers_serialized = UserSerializer(sellers, many=True).data
 
     return Response({
         "products": products_serialized,
-        "sellers": sellers_serialized
-    })
+        "top_sellers": sellers_serialized
+    }, status=200)
+

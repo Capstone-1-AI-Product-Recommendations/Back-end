@@ -7,11 +7,12 @@ from django.http import JsonResponse
 from rest_framework import status
 from django.db.models import Q
 from datetime import datetime, timedelta
-from .models import Notification, UserBrowsingBehavior
-from seller_dashboard.models import Ad
-from users.models import User, Role
-from products.models import Category
-from orders.models import Order, OrderItem
+from web_backend.models import *
+# from .models import Notification, UserBrowsingBehavior
+# from seller_dashboard.models import Ad
+# from users.models import User, Role
+# from products.models import Category
+# from orders.models import Order, OrderItem
 from django.db.models import Sum
 from django.db.models import F
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer

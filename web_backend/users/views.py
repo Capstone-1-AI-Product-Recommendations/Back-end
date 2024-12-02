@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
 from .serializers import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer
-from web_backend.models import Role, User, UserBankAccount
+# from web_backend.models import Role, User, UserBankAccount
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt
@@ -16,7 +16,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from .decorators import admin_required
-from .models import User, Role
+# from .models import User, Role
+from web_backend.models import *
 
 # Register User
 @csrf_exempt

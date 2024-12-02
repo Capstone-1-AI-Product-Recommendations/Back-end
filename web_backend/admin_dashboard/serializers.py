@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from .models import Notification, UserBrowsingBehavior
-from users.models import User
-from products.models import Product
+# from .models import Notification, UserBrowsingBehavior
+# from users.models import User
+# from products.models import Product
+from web_backend.models import *
 
 class NotificationSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()  # Chuyển đổi user thành dạng chuỗi nếu cần hiển thị thông tin người dùng.
