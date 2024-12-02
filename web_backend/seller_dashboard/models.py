@@ -1,5 +1,5 @@
 from django.db import models
-from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
+from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, Notification, Comment, ProductRecommendation
 from django.contrib.auth.models import User
 # Create your models here.
 class ProductAd(models.Model):

@@ -20,8 +20,8 @@ class Ad(models.Model):
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True,blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True,blank=True, null=True)
 
     class Meta:
         managed = False
@@ -46,9 +46,9 @@ class User(models.Model):
     address = models.TextField(blank=True, null=True)
     phone_number = models.CharField(max_length=20)
     reset_token = models.CharField(max_length=50, blank=True, null=True)
-    reset_token_expiry = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    reset_token_expiry = models.DateTimeField(auto_now_add=True,blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     
@@ -56,8 +56,6 @@ class User(models.Model):
         if not self.role:
             self.role = Role.objects.get_or_create(role_name="User")[0]
         super().save(*args, **kwargs)
-        if self.role and self.role.role_name == "Seller" and not hasattr(self, 'seller_profile'):
-            SellerProfile.objects.get_or_create(user=self)
     class Meta:
         managed = False
         db_table = 'user'
@@ -76,8 +74,8 @@ class AdView(models.Model):
 
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -111,8 +109,8 @@ class Product(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     quantity = models.IntegerField()
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     seller = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
@@ -126,7 +124,7 @@ class Product(models.Model):
 class CartItem(models.Model):
     cart_item_id = models.AutoField(primary_key=True)
     quantity = models.IntegerField(blank=True, null=True)
-    added_at = models.DateTimeField(blank=True, null=True)
+    added_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     cart = models.ForeignKey(Cart, models.DO_NOTHING)
     product = models.ForeignKey(Product, models.DO_NOTHING)
 
@@ -139,7 +137,7 @@ class Comment(models.Model):
     comment_id = models.AutoField(primary_key=True)
     comment = models.TextField()
     rating = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     product = models.ForeignKey(Product, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
@@ -152,8 +150,8 @@ class Notification(models.Model):
     notification_id = models.AutoField(primary_key=True)
     message = models.TextField()
     is_read = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:
         managed = False
@@ -164,8 +162,8 @@ class Order(models.Model):
     order_id = models.AutoField(primary_key=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -191,8 +189,8 @@ class Payment(models.Model):
     status = models.CharField(max_length=20)
     payment_method = models.CharField(max_length=50)
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
-    created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True,)
+    updated_at = models.DateTimeField(auto_now_add=True,)
     order = models.ForeignKey(Order, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
@@ -224,7 +222,7 @@ class ProductImage(models.Model):
 class ProductRecommendation(models.Model):
     recommendation_id = models.AutoField(primary_key=True)
     session_id = models.CharField(max_length=255)
-    recommended_at = models.DateTimeField(blank=True, null=True)
+    recommended_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -245,21 +243,11 @@ class ProductVideo(models.Model):
         db_table = 'product_video'
 
 
-class SellerProfile(models.Model):
-    seller_id = models.CharField(primary_key=True, max_length=50)
-    store_name = models.CharField(max_length=255, blank=True, null=True)
-    store_address = models.TextField(blank=True, null=True)
-    user = models.OneToOneField(User, models.DO_NOTHING)
-
-    class Meta:
-        managed = False
-        db_table = 'seller_profile'
-
 
 class Shop(models.Model):
     shop_id = models.AutoField(primary_key=True)
     shop_name = models.CharField(max_length=255)
-    user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -272,7 +260,7 @@ class ShopInfo(models.Model):
     product_count = models.IntegerField(blank=True, null=True)
     followers_count = models.IntegerField(blank=True, null=True)
     is_following = models.IntegerField(blank=True, null=True)
-    join_date = models.DateTimeField(blank=True, null=True)
+    join_date = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -296,7 +284,7 @@ class UserBrowsingBehavior(models.Model):
     behavior_id = models.AutoField(primary_key=True)
     activity_type = models.CharField(max_length=50)
     interaction_value = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    timestamp = models.DateTimeField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     product = models.ForeignKey(Product, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 

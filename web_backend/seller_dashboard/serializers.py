@@ -1,8 +1,8 @@
 # seller_dashboard/serializers.py
 from rest_framework import serializers
-from .models import Ad, AdView, ProductAd
+# from .models import Ad, AdView, ProductAd
 from products.serializers import ProductSerializer  # Import ProductSerializer cho việc hiển thị thông tin sản phẩm
-from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
+from web_backend.models import ShopInfo, Product, Order, OrderItem, Ad, ProductAd, Notification, Comment, ProductRecommendation, Shop
 
 class AdSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,11 +10,11 @@ class AdSerializer(serializers.ModelSerializer):
         fields = ['ad_id', 'title', 'description', 'discount_percentage', 'start_date', 'end_date', 'created_at', 'updated_at']
         # Cập nhật các trường cho phù hợp với model Ad
 
-class AdViewSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AdView
-        fields = ['ad_view_id', 'user', 'ad', 'viewed_at']
-        # Cập nhật các trường cho phù hợp với model AdView
+# class AdViewSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = AdView
+#         fields = ['ad_view_id', 'user', 'ad', 'viewed_at']
+#         # Cập nhật các trường cho phù hợp với model AdView
 
 class ProductAdSerializer(serializers.ModelSerializer):
     product = serializers.SerializerMethodField()
@@ -52,12 +52,6 @@ class ProductAdSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductAd
         fields = '__all__'
-
-class SellerProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SellerProfile
-        fields = '__all__'
-
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
@@ -72,3 +66,17 @@ class ProductRecommendationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductRecommendation
         fields = '__all__'
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ['shop_name']
+    
+    def validate_shop_name(self, value):
+        if not value:
+            raise serializers.ValidationError("Shop name is required.")
+        return value
+        
+class ShopInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopInfo
+        fields = ['shop_info_id', 'product_count', 'followers_count', 'is_following', 'join_date']
