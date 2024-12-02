@@ -36,7 +36,7 @@ def create_order(request, user_id):
 
         # Kiểm tra sự tồn tại của CartItems và tạo đơn hàng
         cart_items = CartItem.objects.filter(cart_item_id__in=cart_item_ids, cart__user=user)
-        if not cart_items:
+        if not cart_items.exists():
             return Response({"error": "Không tìm thấy sản phẩm trong giỏ hàng."}, status=status.HTTP_404_NOT_FOUND)
 
         # Tạo đơn hàng mới
@@ -58,12 +58,15 @@ def create_order(request, user_id):
                 order=order,
                 product=product,
                 quantity=quantity,
-                price=price,
+                price = price * quantity,
             )
 
         # Cập nhật tổng tiền của đơn hàng
         order.total = total_amount
         order.save()
+
+        # Xóa các CartItem sau khi tạo OrderItem
+        cart_items.delete()
 
         # Thông tin nhận hàng (có thể thay đổi)
         recipient_name = request.data.get('recipient_name', user.full_name)
@@ -80,27 +83,61 @@ def create_order(request, user_id):
             }
         )
 
-        # Trả về thông tin đơn hàng và thông tin nhận hàng
+        # Trả về thông tin đơn hàng
         order_serializer = OrderSerializer(order)
         return Response(order_serializer.data, status=status.HTTP_201_CREATED)
     
 @api_view(['PUT'])
 def update_shipping_address(request, user_id):
     # Lấy thông tin người dùng
-    user = User.objects.get(id=user_id)
-
+    user = User.objects.get(user_id=user_id)
     # Lấy thông tin nhận hàng của người dùng
     shipping_address = ShippingAddress.objects.filter(user=user).first()
-
     if not shipping_address:
         return Response({"error": "Thông tin nhận hàng không tồn tại."}, status=status.HTTP_400_BAD_REQUEST)
-
     # Cập nhật thông tin nhận hàng
     shipping_address.recipient_name = request.data.get('recipient_name', shipping_address.recipient_name)
     shipping_address.recipient_phone = request.data.get('recipient_phone', shipping_address.recipient_phone)
     shipping_address.recipient_address = request.data.get('recipient_address', shipping_address.recipient_address)
-
     # Lưu thông tin nhận hàng đã cập nhật
     shipping_address.save()
-
     return Response({"message": "Thông tin nhận hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
+
+@api_view(['DELETE'])
+def cancel_order_item(request, user_id, order_item_id):
+    try:
+        # Lấy thông tin người dùng
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        # Lấy OrderItem từ ID và đảm bảo nó thuộc đơn hàng của người dùng
+        order_item = OrderItem.objects.get(order_item_id=order_item_id, order__user=user)
+    except OrderItem.DoesNotExist:
+        return Response({"error": "Order item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy đơn hàng từ OrderItem để kiểm tra trạng thái
+    order = order_item.order
+
+    # Kiểm tra nếu đơn hàng đã hủy hoặc đã giao
+    if order.status in ['Canceled', 'Delivered', 'Confirmed']:
+        return Response({"error": f"Không thể hủy sản phẩm trong đơn hàng đã ở trạng thái '{order.status}'."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Cập nhật số lượng sản phẩm trong Product
+    product = order_item.product
+
+    # Tăng lại số lượng sản phẩm trong kho
+    product.quantity += order_item.quantity
+    product.save()
+    # Cập nhật tổng tiền của đơn hàng (trừ đi số tiền của OrderItem bị xóa)
+    order.total -= order_item.price 
+    order.save()
+    # Xóa OrderItem khỏi đơn hàng
+    order_item.delete()
+    # Kiểm tra xem đơn hàng còn sản phẩm nào không, nếu không có thì hủy đơn hàng
+    if not order.orderitem_set.exists():
+        order.status = 'Canceled'  # Nếu không còn sản phẩm, hủy đơn hàng
+        order.save()
+
+    return Response({"message": "Đơn hàng đã được hủy."}, status=status.HTTP_200_OK)

@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from datetime import date
 from users.decorators import seller_required
-from .serializers import AdSerializer, ProductSerializer, ProductAdSerializer
+# from .serializers import AdSerializer, ProductSerializer, ProductAdSerializer
 # from .models import Ad, ProductAd
 # from products.models import Product
 
@@ -31,6 +31,49 @@ def get_order_details(request, seller_id, order_id):
         'items': order_item_serializer.data
     })
 
+@api_view(['GET', 'PUT'])
+def update_order_status(request, order_item_id, seller_id):
+    try:
+        # Lấy OrderItem theo order_item_id
+        order_item = OrderItem.objects.get(order_item_id=order_item_id)
+
+        # Lấy Order từ OrderItem
+        order = order_item.order
+
+        if request.method == 'GET':
+            # Trả về thông tin đơn hàng và trạng thái
+            return Response({
+                "order_id": order.order_id,
+                "status": order.status,
+                "total_amount": order.total,
+                "user_id": order.user.user_id,
+                "product_name": order_item.product.name,
+                "quantity": order_item.quantity,
+                "product_price": order_item.price,
+            }, status=status.HTTP_200_OK)
+
+        elif request.method == 'PUT':
+            # Kiểm tra xem seller_id có phải là người bán của sản phẩm trong OrderItem không
+            if order_item.product.seller.user_id != seller_id:
+                return Response({"error": "Bạn không phải là người bán của sản phẩm trong đơn hàng này."}, status=status.HTTP_403_FORBIDDEN)
+
+            # Kiểm tra trạng thái hiện tại của đơn hàng
+            if order.status == 'Confirmed':
+                return Response({"error": "Đơn hàng đã được xác nhận."}, status=status.HTTP_400_BAD_REQUEST)
+            elif order.status == 'Canceled':
+                return Response({"error": "Đơn hàng đã bị hủy."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Cập nhật trạng thái đơn hàng từ 'Pending' sang 'Confirmed'
+            order.status = 'Confirmed'
+            order.save()
+
+            return Response({"message": "Trạng thái đơn hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
+
+    except OrderItem.DoesNotExist:
+        return Response({"error": "Sản phẩm trong đơn hàng không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
+    except Order.DoesNotExist:
+        return Response({"error": "Đơn hàng không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
+    
 # Quản lý quảng cáo (Ad)
 @api_view(['POST'])
 def create_ad(request, seller_id, product_id):

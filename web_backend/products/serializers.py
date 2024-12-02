@@ -7,6 +7,7 @@ import requests
 from django.core.files.base import ContentFile
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 # Serializer cho Product
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -131,32 +132,33 @@ class CRUDProductSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         images = validated_data.pop('images', [])
         videos = validated_data.pop('videos', [])
+    
+        with transaction.atomic():
+            # Cập nhật các trường khác
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
 
-        # Cập nhật các trường khác
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+            try:
+                # Xóa ảnh cũ trước khi upload mới
+                if images:
+                    instance.images.all().delete()
+                    for image in images:
+                        compressed_image = compress_and_upload_image(image)
+                        cloudinary_response = cloudinary_upload(compressed_image, folder='products/images/')
+                        ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
 
-        # Xử lý ảnh và upload lên Cloudinary
-        if images:
-            instance.images.all().delete()  # Xóa các ảnh cũ
-            for image in images:
-                try:
-                    compressed_image = compress_and_upload_image(image)
-                    cloudinary_response = cloudinary_upload(compressed_image, folder='products/images/')
-                    ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
-                except Exception as e:
-                    return Response({"detail": f"Error uploading image: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Xử lý video và upload lên Cloudinary
-        if videos:
-            instance.videos.all().delete()  # Xóa các video cũ
-            for video in videos:
-                try:
-                    compressed_video = compress_and_upload_video(video)
-                    cloudinary_response = cloudinary_upload(compressed_video, resource_type="video", folder='products/videos/')
-                    ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
-                except Exception as e:
-                    return Response({"detail": f"Error uploading video: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+                # Xóa video cũ trước khi upload mới
+                if videos:
+                    instance.videos.all().delete()
+                    for video in videos:
+                        compressed_video = compress_and_upload_video(video)
+                        cloudinary_response = cloudinary_upload(compressed_video, resource_type="video", folder='products/videos/')
+                        ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
+        
+            except Exception as e:
+                # Nếu có lỗi, rollback toàn bộ giao dịch
+                transaction.set_rollback(True)
+                raise serializers.ValidationError({"detail": f"Error processing files: {str(e)}"})
 
         return instance

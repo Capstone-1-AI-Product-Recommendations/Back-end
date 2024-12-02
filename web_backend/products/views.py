@@ -58,7 +58,6 @@ def update_product(request, seller_id, product_id):
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
     # Cập nhật seller trong request data
     request.data['seller'] = seller_id  # Truyền seller_id vào request data
-
     serializer = CRUDProductSerializer(product, data=request.data, partial=True)
     if serializer.is_valid():
         updated_product = serializer.save()
