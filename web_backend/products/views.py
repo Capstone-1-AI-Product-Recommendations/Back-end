@@ -20,7 +20,6 @@ def product_detail(request, user_id, product_id):
                                   .get(product_id=product_id)        
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-
     serializer = DetailProductSerializer(product)
     return Response(serializer.data)
 
@@ -62,19 +61,16 @@ def update_product(request, seller_id, shop_info_id, product_id):
             return Response({"detail": "Only sellers can update products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    
     # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
     try:
         shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
         shop = shop_info.shop  # Lấy thông tin shop từ shop_info
     except ShopInfo.DoesNotExist:
         return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-
     # Truy xuất sản phẩm cần cập nhật thông qua mối quan hệ với User (seller)
     try:
         # Kiểm tra sản phẩm có thuộc về seller hay không
-        product = Product.objects.get(product_id=product_id, seller=seller)
-        
+        product = Product.objects.get(product_id=product_id, seller=seller)        
         # Kiểm tra sản phẩm có thuộc về shop tương ứng hay không
         if product.seller == seller:  # Kiểm tra seller của sản phẩm
             # Cập nhật sản phẩm (ví dụ: cập nhật tên sản phẩm và giá trị mới từ request)
@@ -82,14 +78,12 @@ def update_product(request, seller_id, shop_info_id, product_id):
             product_price = request.data.get('price', product.price)
             product_quantity = request.data.get('quantity', product.quantity)
             product_description = request.data.get('description', product.description)
-
             # Lưu các thay đổi
             product.name = product_name
             product.price = product_price
             product.quantity = product_quantity
             product.description = product_description
             product.save()
-
             return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
         else:
             return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
@@ -97,20 +91,35 @@ def update_product(request, seller_id, shop_info_id, product_id):
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['DELETE'])
-def delete_product(request, product_id, seller_id):
+def delete_product(request, seller_id, shop_info_id, product_id):
+    # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
-        # Lấy sản phẩm từ database
-        product = Product.objects.get(pk=product_id)
+        seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Only sellers can delete products."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
+    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+    try:
+        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
+        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
+    except ShopInfo.DoesNotExist:
+        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
+    # Kiểm tra sản phẩm có thuộc về seller và shop hay không
+    try:
+        product = Product.objects.get(product_id=product_id, seller=seller)
+        if product.seller == seller:
+            # Giảm số lượng sản phẩm trong ShopInfo
+            if shop_info.product_count > 0:
+                shop_info.product_count -= 1
+                shop_info.save()
+            # Xóa sản phẩm
+            product.delete()
+            return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Kiểm tra xem seller_id có đúng là seller của sản phẩm hay không
-    if product.seller.pk != seller_id:
-        return Response({"detail": "You are not authorized to delete this product."}, status=status.HTTP_403_FORBIDDEN)
-    
-    # Nếu là seller đúng, xóa sản phẩm
-    product.delete()
-    return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
 
 # BASE_URL = 'http://localhost:8000'
