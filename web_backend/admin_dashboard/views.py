@@ -7,11 +7,14 @@ from django.http import JsonResponse
 from rest_framework import status
 from django.db.models import Q
 from datetime import datetime, timedelta
-from .models import Notification, UserBrowsingBehavior
-from seller_dashboard.models import Ad
-from users.models import User
-from products.models import Category
-from orders.models import Order
+from web_backend.models import *
+# from .models import Notification, UserBrowsingBehavior
+# from seller_dashboard.models import Ad
+# from users.models import User, Role
+# from products.models import Category
+# from orders.models import Order, OrderItem
+from django.db.models import Sum
+from django.db.models import F
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
 from products.serializers import CategorySerializer
@@ -82,9 +85,9 @@ def search_users(request):
         return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     users = User.objects.filter(
-        Q(username__icontains=query) |  # Tìm kiếm theo username
-        Q(email__icontains=query) |    # Tìm kiếm theo email
-        Q(role__role_name__icontains=query)  # Tìm kiếm theo tên vai trò
+        Q(username__icontains=query) |
+        Q(email__icontains=query) |
+        Q(role__role_name__icontains=query)
     ).distinct()
 
     if users.exists():
@@ -104,7 +107,7 @@ def get_users_by_role(request, role_name):
     except Role.DoesNotExist:
         return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
 
-# API check trang thái của người dùng
+# API kiểm tra trạng thái của người dùng (GET)
 @api_view(['GET'])
 @admin_required
 def check_user_active_status(request, user_id):
@@ -118,8 +121,7 @@ def check_user_active_status(request, user_id):
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
-# API active / ban tài khoản người dùng
+# API active/ban tài khoản người dùng (PUT)
 @api_view(['PUT'])
 @admin_required
 def toggle_user_active_status(request, user_id):
@@ -134,7 +136,7 @@ def toggle_user_active_status(request, user_id):
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-# API Tạo Thông Báo Cho Người Dùng
+# API gửi thông báo cho người dùng (POST)
 @api_view(['POST'])
 @admin_required
 def send_notification(request):
@@ -153,11 +155,11 @@ def send_notification(request):
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
     for user in users:
-        Notification.objects.create(user=user, message=message, is_read=0)
+        Notification.objects.create(user=user, message=message, is_read=False)
 
     return Response({'message': 'Notification(s) sent successfully'}, status=status.HTTP_201_CREATED)
 
-# API Xem Lịch Sử Thông Báo Được Gửi
+# API xem lịch sử thông báo (GET)
 @api_view(['GET'])
 @admin_required
 def get_notification_history(request, user_id=None):
@@ -169,7 +171,8 @@ def get_notification_history(request, user_id=None):
     serialized_data = NotificationSerializer(notifications, many=True).data
     return Response(serialized_data, status=status.HTTP_200_OK)
 
-# API Tạo một danh mục sản phẩm mới
+
+# API tạo danh mục sản phẩm mới (POST)
 @api_view(['POST'])
 @admin_required
 def create_category(request):
@@ -179,7 +182,7 @@ def create_category(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# API Cập nhật danh mục sản phẩm
+# API cập nhật danh mục sản phẩm (PUT)
 @api_view(['PUT'])
 @admin_required
 def update_category(request, category_id):
@@ -194,7 +197,7 @@ def update_category(request, category_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# API Xóa danh 1 danh mục sản phẩm
+# API xóa danh mục sản phẩm (DELETE)
 @api_view(['DELETE'])
 @admin_required
 def delete_category(request, category_id):
@@ -205,7 +208,7 @@ def delete_category(request, category_id):
     except Category.DoesNotExist:
         return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
 
-# API Lấy danh sách đơn hàng
+# API lấy danh sách đơn hàng (GET)
 @api_view(['GET'])
 @admin_required
 def get_orders(request):
@@ -213,7 +216,7 @@ def get_orders(request):
     serialized_data = OrderSerializer(orders, many=True).data
     return Response(serialized_data, status=status.HTTP_200_OK)
 
-# API Tìm kiếm đơn hàng
+# API tìm kiếm đơn hàng (GET)
 @api_view(['GET'])
 @admin_required
 def search_orders(request):
@@ -235,7 +238,7 @@ def search_orders(request):
 
     return Response({'message': 'No orders found matching the query'}, status=status.HTTP_404_NOT_FOUND)
 
-# API chi tiết đơn hàng
+# API lấy chi tiết đơn hàng (GET)
 @api_view(['GET'])
 @admin_required
 def get_order_detail(request, order_id):
@@ -247,22 +250,17 @@ def get_order_detail(request, order_id):
         return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
-# API Cập nhật trạng thái đơn hàng
+# API cập nhật trạng thái đơn hàng (PUT)
 @api_view(['PUT'])
 @admin_required
 def update_order_status(request, order_id):
     try:
         order = Order.objects.get(order_id=order_id)
-        new_status = request.data.get('status')
-        if not new_status:
-            return Response({'error': 'Status is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        order.status = new_status
+        order.status = request.data.get('status', order.status)
         order.save()
         return Response({'message': 'Order status updated successfully'}, status=status.HTTP_200_OK)
     except Order.DoesNotExist:
         return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-
 
 # API Xóa đơn hàng
 @api_view(['DELETE'])
@@ -271,7 +269,7 @@ def delete_order(request, order_id):
     try:
         order = Order.objects.get(order_id=order_id)
         order.delete()
-        return Response({'message': 'Order deleted successfully'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Order deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
     except Order.DoesNotExist:
         return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -301,7 +299,7 @@ def delete_user_browsing_behavior(request, behavior_id):
     try:
         behavior = UserBrowsingBehavior.objects.get(behavior_id=behavior_id)
         behavior.delete()
-        return Response({'message': 'Browsing behavior deleted successfully'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Browsing behavior deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
     except UserBrowsingBehavior.DoesNotExist:
         return Response({'error': 'Browsing behavior not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -309,7 +307,7 @@ def delete_user_browsing_behavior(request, behavior_id):
 @api_view(['GET'])
 @admin_required
 def get_current_customers(request):
-    customers = User.objects.filter(order__isnull=False).distinct()  # Khách hàng có đơn hàng
+    customers = User.objects.filter(order__isnull=False).distinct()  # Khách hàng đã có đơn hàng
     serialized_data = UserSerializer(customers, many=True).data
     return Response(serialized_data, status=status.HTTP_200_OK)
 
@@ -325,7 +323,6 @@ def get_new_customers(request):
 @api_view(['GET'])
 @admin_required
 def get_target_customers(request):
-    # Lấy danh sách người dùng có hành vi duyệt web hoặc xem quảng cáo
     customers = User.objects.filter(
         Q(userbrowsingbehavior__isnull=False) |  # Có hành vi duyệt web
         Q(adview__isnull=False)  # Xem quảng cáo
@@ -397,3 +394,64 @@ def get_new_customers(request, period):
         "new_customers": new_customers_count,
     }
     return Response(data, status=status.HTTP_200_OK)
+
+# API lấy thông tin admin
+@api_view(['GET'])
+@admin_required
+def get_admin_info(request):
+    try:
+        admin_role = Role.objects.get(name='admin')  # Vai trò admin
+        admins = User.objects.filter(role=admin_role)
+
+        data = [
+            {
+                "user_id": admin.user_id,
+                "username": admin.username,
+                "email": admin.email,
+                "full_name": admin.full_name,
+                "created_at": admin.created_at,
+            }
+            for admin in admins
+        ]
+
+        return Response({"admins": data}, status=status.HTTP_200_OK)
+
+    except Role.DoesNotExist:
+        return Response({"error": "Admin role not found"}, status=status.HTTP_404_NOT_FOUND)
+
+# API chỉnh sửa thông tin admin
+@api_view(['PUT'])
+@admin_required
+def update_admin_info(request, admin_id):
+    try:
+        admin_role = Role.objects.get(name='admin')
+        admin_user = User.objects.get(user_id=admin_id, role=admin_role)
+    except Role.DoesNotExist:
+        return Response({"error": "Admin role not found"}, status=status.HTTP_404_NOT_FOUND)
+    except User.DoesNotExist:
+        return Response({"error": "Admin user not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy dữ liệu từ request
+    data = request.data
+    allowed_fields = ['username', 'email', 'full_name']
+
+    # Chỉ cho phép chỉnh sửa các trường đã định sẵn
+    for field in allowed_fields:
+        if field in data:
+            setattr(admin_user, field, data[field])
+
+    # Lưu thông tin
+    admin_user.save()
+
+    return Response(
+        {
+            "message": "Admin information updated successfully",
+            "admin": {
+                "user_id": admin_user.user_id,
+                "username": admin_user.username,
+                "email": admin_user.email,
+                "full_name": admin_user.full_name,
+            }
+        },
+        status=status.HTTP_200_OK
+    )

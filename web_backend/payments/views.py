@@ -1,24 +1,28 @@
-from time import time
-import uuid, json, hmac, hashlib, urllib.request, random
-from datetime import datetime
-# import requests
-from rest_framework import status
+from rest_framework import status  # Ensure this import is present
 from rest_framework.response import Response
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from web_backend.models import Payment, Order
-from .serializer import PaymentSerializer
+from .serializers import PaymentSerializer
+import json
+import hmac
+import hashlib
+import uuid
+import requests
+from time import time
+from datetime import datetime
 from django.utils import timezone
 from django.http import JsonResponse
-# Create your views here.
+from django.views.decorators.csrf import csrf_exempt
 
+# ZaloPay configuration
 config = {
     "appid": 554,  # App ID của bạn trên ZaloPay
     "key1": "8NdU5pG5R2spGHGhyO99HN1OhD8IQJBn",  # Key1 của bạn
     "key2": "uUfsWgfLkRLzq6W2uNXTCxrfxs51auny",  # Key2 của bạn
     "endpoint": "https://sandbox.zalopay.com.vn/v001/tpe/createorder"  # Endpoint của ZaloPay (sandbox)
 }
+
 
 # Thanh toán khi nhận hàng (COD)
 @csrf_exempt
@@ -28,6 +32,7 @@ def cod_payment(request, order_id):
         order = get_object_or_404(Order, order_id=order_id)
         if order.status != 'PENDING':
             return Response({"message": "Order is not in pending status."}, status=status.HTTP_400_BAD_REQUEST)
+
         # Tạo bản ghi thanh toán khi nhận hàng
         payment = Payment.objects.create(
             user=order.user,
@@ -37,14 +42,17 @@ def cod_payment(request, order_id):
             payment_method="Cash on Delivery",
             transaction_id=f"CASH_{timezone.now().strftime('%Y%m%d%H%M%S')}",
         )
+
         # Cập nhật trạng thái đơn hàng
         order.status = 'COMPLETED'
         order.save()
+
         # Dùng serializer để trả về thông tin Payment
         payment_serializer = PaymentSerializer(payment)
         return Response(payment_serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # Thanh toán qua ZaloPay
 @csrf_exempt
@@ -53,13 +61,14 @@ def zalopay_payment(request, order_id):
     try:
         # Lấy thông tin người dùng từ request
         user_id = request.data.get('user_id')
-        # Kiểm tra nếu không có thông tin cần thiết
+
+        # Kiểm tra nếu không có thông tin người dùng
         if not user_id:
             return Response({"error": "Thiếu thông tin người dùng"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Lấy thông tin đơn hàng từ cơ sở dữ liệu
-        order = Order.objects.get(order_id=order_id)
-        
+        order = get_object_or_404(Order, order_id=order_id)
+
         # Lấy tổng số tiền từ đơn hàng
         amount = order.total
 
@@ -75,9 +84,12 @@ def zalopay_payment(request, order_id):
             "amount": int(amount) * 1000,  # Đơn vị là đồng
             "description": f"Thanh toán cho đơn hàng {order_id}",
             "bankcode": "",
-            "item": json.dumps([
-                { "itemid": f"item{order.order_id}", "itemname": f"Order {order.order_id}", "itemprice": float(amount), "itemquantity": 1 }
-            ]),
+            "item": json.dumps([{
+                "itemid": f"item{order.order_id}",
+                "itemname": f"Order {order.order_id}",
+                "itemprice": float(amount),
+                "itemquantity": 1
+            }]),
             "embeddata": json.dumps({"merchantinfo": "embeddata123"})
         }
 
@@ -94,7 +106,7 @@ def zalopay_payment(request, order_id):
 
         # Kiểm tra kết quả từ ZaloPay
         if result.get("returncode") == 1:
-            # Lưu thông tin thanh toán vào database 
+            # Lưu thông tin thanh toán vào database
             payment = Payment(
                 user_id=user_id,
                 order=order,
@@ -113,6 +125,8 @@ def zalopay_payment(request, order_id):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# Callback từ ZaloPay
 @csrf_exempt
 @api_view(['POST'])
 def payment_callback(request):
@@ -130,7 +144,7 @@ def payment_callback(request):
         transaction_id = dataJson.get('apptransid')
         status = dataJson.get('status')  # Trạng thái thanh toán (1: Thành công, 0: Thất bại)
 
-        payment = Payment.objects.get(transaction_id=transaction_id)
+        payment = get_object_or_404(Payment, transaction_id=transaction_id)
 
         if status == '1':
             payment.status = 'COMPLETED'  # Thành công
