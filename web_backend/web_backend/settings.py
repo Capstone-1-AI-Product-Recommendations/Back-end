@@ -142,7 +142,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone1',
+        'NAME': 'capstone_1',
         'USER': 'root',
         'PASSWORD': '12345',
         'HOST': 'localhost',
