@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'payments',
     'recommendations',
     'seller_dashboard',
-    'django.contrib.sites',           
+    'django.contrib.sites',         
     'rest_framework.authtoken',
     'dj_rest_auth',
     "dj_rest_auth.registration",
