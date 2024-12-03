@@ -96,7 +96,7 @@ TEMPLATES = [
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 3600
-
+SESSION_SAVE_EVERY_REQUEST = True
 WSGI_APPLICATION = "web_backend.wsgi.application"
 
 GOOGLE_CLIENT_ID = '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com'
@@ -151,6 +151,7 @@ DATABASES = {
         },
     }
 }
+
 
 
 # Password validation

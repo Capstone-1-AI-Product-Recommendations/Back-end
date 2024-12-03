@@ -5,14 +5,21 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
-import re
-from django.db import models
-from django.forms import ValidationError
+from django.db import models  
+from django.utils import timezone
+from datetime import timedelta
 
-def validate_email_format(value):
-    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    if not re.match(email_regex, value):
-        raise ValidationError("Invalid email format.")    
+class VerificationCode(models.Model):
+    email = models.EmailField()
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        """Kiểm tra xem mã xác minh đã hết hạn chưa (5 phút)."""
+        return timezone.now() > self.created_at + timedelta(minutes=5)
+
+    def __str__(self):
+        return f"{self.email} - {self.code}"
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255)
@@ -59,18 +66,6 @@ class User(models.Model):
     class Meta:
         managed = False
         db_table = 'user'
-
-
-class AdView(models.Model):
-    ad_view_id = models.AutoField(primary_key=True)
-    viewed_at = models.DateTimeField(blank=True, null=True)
-    ad = models.ForeignKey(Ad, models.DO_NOTHING)
-    user = models.ForeignKey(User, models.DO_NOTHING)
-
-    class Meta:
-        managed = False
-        db_table = 'ad_view'
-
 
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)

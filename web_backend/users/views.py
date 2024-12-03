@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
 from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
-from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
+from web_backend.models import VerificationCode, Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt, requests
@@ -15,11 +15,19 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import render
 from rest_framework.response import Response
+import re, random
+from django.forms import ValidationError 
+from django.contrib.sessions.models import Session
 # from rest_framework.views import APIView
 # from rest_framework.permissions import IsAdminUser
 # from .decorators import admin_required
 # from .models import User, Role
 # from .serializers import UserSerializer
+
+def validate_email_format(value):
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, value):
+        raise ValidationError("Invalid email format.") 
 
 @csrf_exempt
 @api_view(['POST'])
@@ -189,7 +197,7 @@ def GoogleAuthCallback(request):
         role_instance, created = Role.objects.get_or_create(role_name="User")
         user.role = role_instance
         user.save()
-        # Step 5: Tạo mã JWT cho người dùng mới
+        # Tạo mã JWT cho người dùng mới
         token = jwt.encode({'user_id': user.user_id}, 'your_secret_key', algorithm='HS256')
         return Response({
             "message": "User signed up successfully via Google."
@@ -216,29 +224,92 @@ def reset_password(request):
 
 @api_view(['POST'])
 def forgot_password(request):
-    email = request.data.get('email')  # Lấy email từ yêu cầu
+    email = request.data.get('email')  # Lấy email từ yêu cầu    
     if not email:
-        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)    
+    # Kiểm tra định dạng email
     try:
-        user = User.objects.get(email=email)
-        new_password = get_random_string(8)  # Tạo mật khẩu ngẫu nhiên
-        user.password = make_password(new_password)
-        user.save()
-        # Gửi mật khẩu qua email
+        validate_email_format(email)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)    
+    # Lấy đúng email (chuyển thành chữ thường để tránh sai lệch)
+    email = email.lower().strip()    
+    try:
+        user = User.objects.get(email=email)        
+        # Tạo mã xác thực gồm 6 chữ số
+        verification_code = random.randint(100000, 999999)        
+        # Lưu mã xác thực vào cơ sở dữ liệu
+        # VerificationCode.objects.create(email=email, code=verification_code) 
+        request.session['verification_code'] = verification_code  
+        request.session.modified = True  # Đảm bảo session được lưu lại ngay   
+        # Gửi mã xác thực qua email
         send_mail(
-            subject="Your New Password",
-            message=f"Hi {user.username}, your new password is: {new_password}",
+            subject="Your Password Reset Verification Code",
+            message=f"Hi {user.username}, your verification code is: {verification_code}",
             from_email="your_email@example.com",
             recipient_list=[email],
             fail_silently=False,
         )        
-        # Chuyển hướng đến trang login sau khi gửi email thành công
-        return redirect('http://127.0.0.1:8000/api/login/') 
+        return Response({"detail": "Verification code sent to your email.", "redirect_url": "http://127.0.0.1:8000/api/verify_reset_code/",}, status=status.HTTP_200_OK)    
     except User.DoesNotExist:
         return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+@api_view(['POST'])
+def verify_reset_code(request):
+    email = request.data.get('email')
+    verification_code = request.session.get('verification_code')
+    
+    if not email or not verification_code:
+        return Response({"error": "Email and verification code are required."}, status=status.HTTP_400_BAD_REQUEST)
+    # Kiểm tra mã xác thực từ session
+    session_code = request.session.get('verification_code')    
+    if not session_code:
+        return Response({"error": "Verification code has expired or is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if session_code != verification_code:
+        return Response({"error": "Invalid verification code. Please check the code or request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Lấy người dùng từ email
+        user = User.objects.get(email=email.lower().strip())
+        return Response({"detail": "Verification successful, you can now reset your password.", "redirect_url": "http://127.0.0.1:8000/api/new_password/"}, status=status.HTTP_200_OK)
+    
+    except VerificationCode.DoesNotExist:
+        return Response({"error": "User not found with the provided email."}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+def new_password(request):
+    email = request.data.get('email')
+    new_password = request.data.get('new_password')
+    confirm_password = request.data.get('confirm_password')
+    
+    if not email or not new_password or not confirm_password:
+        return Response({"error": "Email, new password, and confirm password are required."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Kiểm tra mật khẩu mới và mật khẩu xác nhận có khớp không
+    if new_password != confirm_password:
+        return Response({"error": "The new password and confirm password do not match."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Lấy người dùng từ email
+        user = User.objects.get(email=email.lower().strip())
+
+        # Đặt lại mật khẩu mới
+        user.password = make_password(new_password)
+        user.save()
+
+        # Xóa mã xác thực khỏi session sau khi đặt lại mật khẩu
+        if 'verification_code' in request.session:
+            del request.session['verification_code']
+        return Response({"detail": "Password reset successfully."}, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['PUT'])
 def update_user(request, user_id):
     try:
