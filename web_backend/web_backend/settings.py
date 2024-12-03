@@ -127,7 +127,11 @@ CLOUDINARY_STORAGE = {
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
-
+# CLOUDINARY_STORAGE = {
+#     'CLOUD_NAME': 'dm4ap0fdl',
+#     'API_KEY': '599957161926269',
+#     'API_SECRET': 'BHzERLhYQxFtILhaU2JoouUTg4U'
+# }
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 # CLOUD_NAME = 'dkleeailh'
 # API_KEY = '171326873511271'

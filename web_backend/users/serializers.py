@@ -18,7 +18,7 @@ class UserBankAccountSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 class RegisUserSerializer(serializers.ModelSerializer):
     # role = RoleSerializer(required=False, allow_null=True)
-    # bank_accounts = UserBankAccountSerializer(many=True, read_only=True, source='userbankaccount_set')
+    bank_accounts = UserBankAccountSerializer(many=True, read_only=True, source='userbankaccount_set')
     class Meta:
         model = User
         fields = ['user_id', 'username', 'password', 'email', 'full_name','address', 'phone_number', 'role', 'bank_accounts', 'created_at', 'updated_at']

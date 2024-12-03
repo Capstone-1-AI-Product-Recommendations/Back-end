@@ -1,7 +1,8 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, parser_classes 
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Product, User, Category, Comment, ShopInfo, Shop
+from web_backend.models import Product, User, Category, Comment, ShopInfo, Shop, ProductImage, ProductVideo
 from .serializers import DetailProductSerializer, CRUDProductSerializer, ProductSerializer, CommentSerializer, CategorySerializer, DetailCommentSerializer
 from django.db.models import Prefetch
 from django.shortcuts import render
@@ -11,6 +12,7 @@ from django.db.models import Count, Q
 import requests
 import random
 from django.urls import reverse
+from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 
 @api_view(['GET'])
 def product_detail(request, user_id, product_id):
@@ -24,6 +26,7 @@ def product_detail(request, user_id, product_id):
     return Response(serializer.data)
 
 @api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
 def create_product(request, seller_id, shop_info_id):
     try:
         # Kiểm tra seller_id hợp lệ và là người bán
@@ -39,10 +42,9 @@ def create_product(request, seller_id, shop_info_id):
     except ShopInfo.DoesNotExist:
         return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
     # Sao chép dữ liệu request.data thành một dict có thể sửa đổi
-    data = request.data.copy()
-    data['seller'] = seller_id  # Truyền seller_id vào request data
+    request.data['seller'] = seller_id  # Truyền seller_id vào request data
     # Khởi tạo serializer để tạo sản phẩm
-    serializer = CRUDProductSerializer(data=data)
+    serializer = CRUDProductSerializer(data=request.data)
     if serializer.is_valid():
         # Lưu sản phẩm và gán seller
         product = serializer.save(seller=seller)
@@ -53,6 +55,7 @@ def create_product(request, seller_id, shop_info_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
+@parser_classes([MultiPartParser, FormParser])
 def update_product(request, seller_id, shop_info_id, product_id):
     # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
@@ -70,20 +73,44 @@ def update_product(request, seller_id, shop_info_id, product_id):
     # Truy xuất sản phẩm cần cập nhật thông qua mối quan hệ với User (seller)
     try:
         # Kiểm tra sản phẩm có thuộc về seller hay không
-        product = Product.objects.get(product_id=product_id, seller=seller)        
+        product = Product.objects.get(product_id=product_id, seller=seller)
+        
         # Kiểm tra sản phẩm có thuộc về shop tương ứng hay không
         if product.seller == seller:  # Kiểm tra seller của sản phẩm
-            # Cập nhật sản phẩm (ví dụ: cập nhật tên sản phẩm và giá trị mới từ request)
+            
+            # Cập nhật thông tin sản phẩm
             product_name = request.data.get('name', product.name)
             product_price = request.data.get('price', product.price)
             product_quantity = request.data.get('quantity', product.quantity)
             product_description = request.data.get('description', product.description)
-            # Lưu các thay đổi
+            
+            # Cập nhật thông tin sản phẩm
             product.name = product_name
             product.price = product_price
             product.quantity = product_quantity
             product.description = product_description
+
+            # Xử lý ảnh (nếu có ảnh mới)
+            images_data = request.FILES.getlist('images', [])
+            if images_data:
+                # Xóa các ảnh cũ
+                product.images.all().delete()
+                for image_data in images_data:
+                    image_url = compress_and_upload_image(image_data)
+                    ProductImage.objects.create(product=product, file=image_url)
+
+            # Xử lý video (nếu có video mới)
+            videos_data = request.FILES.getlist('videos', [])
+            if videos_data:
+                # Xóa các video cũ
+                product.videos.all().delete()
+                for video_data in videos_data:
+                    video_url = compress_and_upload_video(video_data)
+                    ProductVideo.objects.create(product=product, file=video_url)
+
+            # Lưu các thay đổi
             product.save()
+
             return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
         else:
             return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)

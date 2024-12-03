@@ -28,7 +28,7 @@ class Ad(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True,blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True,blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True,blank=True, null=True)
 
     class Meta:
         managed = False
@@ -55,7 +55,7 @@ class User(models.Model):
     reset_token = models.CharField(max_length=50, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(auto_now_add=True,blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     
@@ -70,7 +70,7 @@ class User(models.Model):
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -105,7 +105,7 @@ class Product(models.Model):
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     quantity = models.IntegerField()
     category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
     seller = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
@@ -158,7 +158,7 @@ class Order(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -185,7 +185,7 @@ class Payment(models.Model):
     payment_method = models.CharField(max_length=50)
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True,)
-    updated_at = models.DateTimeField(auto_now_add=True,)
+    updated_at = models.DateTimeField(auto_now=True,)
     order = models.ForeignKey(Order, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 

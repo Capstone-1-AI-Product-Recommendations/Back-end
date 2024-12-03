@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Product, Category, Comment
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User
 from cloudinary.uploader import upload as cloudinary_upload
+from cloudinary.uploader import upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 import requests
 from django.core.files.base import ContentFile
@@ -70,10 +71,12 @@ class DetailCommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ['user', 'comment', 'rating', 'created_at']
 class ProductImageSerializer(serializers.ModelSerializer):
+    file = serializers.CharField() 
     class Meta:
         model = ProductImage
         fields = ['file']
 class ProductVideoSerializer(serializers.ModelSerializer):
+    file = serializers.CharField()
     class Meta:
         model = ProductVideo
         fields = ['file']
@@ -113,52 +116,31 @@ class CRUDProductSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        images = validated_data.pop('images', [])
-        videos = validated_data.pop('videos', [])
-        product = super().create(validated_data)
+        # Lấy dữ liệu ảnh và video từ validated_data
+        images_data = validated_data.pop('images', [])
+        videos_data = validated_data.pop('videos', [])
 
-        # Upload images
-        for image in images:
-            image_url = compress_and_upload_image(image)
-            product.images.create(file=image_url)
+        # Tạo sản phẩm mới
+        product = Product.objects.create(**validated_data)
 
-        # Upload videos
-        for video in videos:
-            video_url = compress_and_upload_video(video)
-            product.videos.create(file=video_url)
+        # Xử lý ảnh
+        if images_data:
+            for image_data in images_data:
+                # Tải ảnh lên Cloudinary
+                image_url = compress_and_upload_image(image_data)
+                # upload_result = cloudinary_upload(image_data)
+                # image_url = upload_result.get('secure_url')  # Lấy URL của ảnh từ Cloudinary
+                # Lưu URL ảnh vào bảng ProductImage
+                ProductImage.objects.create(product=product, file=image_url)
+
+        # Xử lý video
+        if videos_data:
+            for video_data in videos_data:
+                # Tải video lên Cloudinary
+                video_url = compress_and_upload_video(video_data)
+                # upload_result = cloudinary_upload(video_data)
+                # video_url = upload_result.get('secure_url')  # Lấy URL của video từ Cloudinary
+                # Lưu URL video vào bảng ProductVideo
+                ProductVideo.objects.create(product=product, file=video_url)
 
         return product
-
-    def update(self, instance, validated_data):
-        images = validated_data.pop('images', [])
-        videos = validated_data.pop('videos', [])
-    
-        with transaction.atomic():
-            # Cập nhật các trường khác
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
-            instance.save()
-
-            try:
-                # Xóa ảnh cũ trước khi upload mới
-                if images:
-                    instance.images.all().delete()
-                    for image in images:
-                        compressed_image = compress_and_upload_image(image)
-                        cloudinary_response = cloudinary_upload(compressed_image, folder='products/images/')
-                        ProductImage.objects.create(product=instance, file=cloudinary_response['secure_url'])
-
-                # Xóa video cũ trước khi upload mới
-                if videos:
-                    instance.videos.all().delete()
-                    for video in videos:
-                        compressed_video = compress_and_upload_video(video)
-                        cloudinary_response = cloudinary_upload(compressed_video, resource_type="video", folder='products/videos/')
-                        ProductVideo.objects.create(product=instance, file=cloudinary_response['secure_url'])
-        
-            except Exception as e:
-                # Nếu có lỗi, rollback toàn bộ giao dịch
-                transaction.set_rollback(True)
-                raise serializers.ValidationError({"detail": f"Error processing files: {str(e)}"})
-
-        return instance
