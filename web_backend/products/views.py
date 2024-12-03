@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Product, User, Category, Comment, ShopInfo, Shop
-from .serializers import DetailProductSerializer, CRUDProductSerializer, ProductSerializer, CommentSerializer, CategorySerializer
+from .serializers import DetailProductSerializer, CRUDProductSerializer, ProductSerializer, CommentSerializer, CategorySerializer, DetailCommentSerializer
 from django.db.models import Prefetch
 from django.shortcuts import render
 from users.serializers import UserSerializer

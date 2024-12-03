@@ -65,7 +65,7 @@ class ProductAdSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductAd
         fields = ['ad_title']  
-class CommentSerializer(serializers.ModelSerializer):
+class DetailCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['user', 'comment', 'rating', 'created_at']
@@ -84,7 +84,7 @@ class DetailProductSerializer(serializers.ModelSerializer):
         source='productrecommendation_set', many=True, read_only=True
     )
     ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
-    comments = CommentSerializer(source='comment_set', many=True, read_only=True)
+    comments = DetailCommentSerializer(source='comment_set', many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     videos = ProductVideoSerializer(many=True, read_only=True)
     class Meta:
