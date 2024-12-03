@@ -1,3 +1,4 @@
+# cart/serializers.py
 from rest_framework import serializers
 # from carts.models import Cart, CartItem  # Import các model trong app carts
 # from products.models import Product  # Giả sử bạn có model Product trong app products

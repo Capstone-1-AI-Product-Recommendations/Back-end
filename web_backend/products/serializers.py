@@ -1,3 +1,4 @@
+# products/serializers.py
 from rest_framework import serializers
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
 from users.serializers import UserSerializer
@@ -6,81 +7,81 @@ from web_backend.utils import compress_and_upload_image, compress_and_upload_vid
 from django.core.files.base import ContentFile
 
 
-# Serializer for Category model
+# Serializer for Category
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['category_id', 'category_name', 'description']
 
 
-# Serializer for Subcategory model
+# Serializer for Subcategory
 class SubcategorySerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.category_name', read_only=True)
 
     class Meta:
         model = Subcategory
-        fields = ['subcategory_id', 'subcategory_name', 'category_name', 'description']
+        fields = ['subcategory_id', 'subcategory_name', 'description', 'category_name']
 
 
-# Serializer for ProductRecommendation model
+# Serializer for ProductRecommendation
 class ProductRecommendationSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.category_name', read_only=True)
+
     class Meta:
         model = ProductRecommendation
-        fields = ['user', 'description']
+        fields = ['recommendation_id', 'session_id', 'description', 'recommended_at', 'category_name', 'product']
 
 
-# Serializer for ProductAd model
+# Serializer for ProductAd
 class ProductAdSerializer(serializers.ModelSerializer):
     ad_title = serializers.CharField(source='ad.title', read_only=True)
 
     class Meta:
         model = ProductAd
-        fields = ['ad_title']
+        fields = ['product_ad_id', 'ad_title']
 
 
-# Serializer for Comment model
+# Serializer for Comment
 class CommentSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='user.username', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Comment
-        fields = ['user', 'comment', 'rating', 'created_at']
+        fields = ['comment_id', 'user_name', 'comment', 'rating', 'created_at']
 
 
-# Serializer for ProductImage model
+# Serializer for ProductImage
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['file', 'product']
+        fields = ['id', 'file']
 
 
-# Serializer for ProductVideo model
+# Serializer for ProductVideo
 class ProductVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVideo
-        fields = ['file', 'product']
+        fields = ['id', 'file']
 
 
-# Serializer for Product model
+# Serializer for Product
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     subcategory = SubcategorySerializer(read_only=True)
-    seller = serializers.CharField(source='seller.username', read_only=True)
-    recommendations = ProductRecommendationSerializer(
-        source='productrecommendation_set', many=True, read_only=True
-    )
-    ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
-    comments = CommentSerializer(source='comment_set', many=True, read_only=True)
+    seller_name = serializers.CharField(source='seller.store_name', read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     videos = ProductVideoSerializer(many=True, read_only=True)
+    comments = CommentSerializer(source='comment_set', many=True, read_only=True)
+    ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
+    recommendations = ProductRecommendationSerializer(source='productrecommendation_set', many=True, read_only=True)
+    computed_rating = serializers.FloatField(source='computed_rating', read_only=True)
 
     class Meta:
         model = Product
         fields = [
-            'product_id', 'name', 'price', 'category', 'subcategory', 'description',
-            'seller', 'images', 'videos', 'quantity', 'recommendations', 'ads', 'comments',
-            'color', 'brand', 'stock_status'
+            'product_id', 'name', 'description', 'price', 'quantity', 'color', 'brand', 'stock_status',
+            'category', 'subcategory', 'seller_name', 'images', 'videos', 'comments', 'ads', 'recommendations', 'computed_rating'
         ]
 
 

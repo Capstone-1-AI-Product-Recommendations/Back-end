@@ -1,3 +1,4 @@
+# recommendation/serializers.py
 from rest_framework import serializers
 # from .models import ProductRecommendation
 from web_backend.models import *

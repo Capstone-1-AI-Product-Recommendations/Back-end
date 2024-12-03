@@ -2,6 +2,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import Count, Sum, F
 # from web_backend.models import Product, Ad
 from .serializers import ProductSerializer, CRUDProductSerializer
 from seller_dashboard.serializers import AdSerializer
@@ -74,12 +75,24 @@ def get_featured_products(request):
     serialized_data = ProductSerializer(featured_products, many=True).data
     return Response(serialized_data)
 
-# API to get trending products (based on user views)
+# API to get trending products based on various criteria
 @api_view(['GET'])
 def get_trending_products(request):
+    # Annotate products with various metrics
     trending_products = Product.objects.annotate(
-        total_views=Count('userbrowsingbehavior__product')
-    ).order_by('-total_views')[:8]
+        total_sales=Sum('orderitem__quantity'),  # Total quantity sold
+        total_views=Count('userbrowsingbehavior__product'),  # Total views
+        total_cart_adds=Count('cartitem__product')  # Total times added to cart
+    ).annotate(
+        # Calculate a composite score based on the criteria
+        trending_score=(
+            F('total_sales') * 0.4 +  # Weight for sales
+            F('total_views') * 0.3 +  # Weight for views
+            F('total_cart_adds') * 0.2 +  # Weight for cart adds
+            F('rating') * 0.1  # Weight for rating
+        )
+    ).order_by('-trending_score')[:8]  # Order by the composite score
+
     serialized_data = ProductSerializer(trending_products, many=True).data
     return Response(serialized_data)
 

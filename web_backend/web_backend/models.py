@@ -148,6 +148,8 @@ class Product(models.Model):
     seller = models.ForeignKey('SellerProfile', on_delete=models.CASCADE, blank=True, null=True)
     color = models.CharField(max_length=100, blank=True, null=True)
     brand = models.CharField(max_length=100, blank=True, null=True)
+    rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
+    detail_product = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -156,6 +158,13 @@ class Product(models.Model):
     @property
     def stock_status(self):
         return 'in_stock' if self.quantity > 0 else 'out_of_stock'
+    @property
+    def computed_rating(self):
+        """
+        Tính rating trung bình từ các comment.
+        """
+        average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
+        return round(average_rating, 1) if average_rating else 0
 
 
 class ProductAd(models.Model):
