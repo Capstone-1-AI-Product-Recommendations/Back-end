@@ -127,11 +127,7 @@ CLOUDINARY_STORAGE = {
     'API_KEY': '171326873511271',
     'API_SECRET': 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 }
-# CLOUDINARY_STORAGE = {
-#     'CLOUD_NAME': 'dm4ap0fdl',
-#     'API_KEY': '599957161926269',
-#     'API_SECRET': 'BHzERLhYQxFtILhaU2JoouUTg4U'
-# }
+
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 # CLOUD_NAME = 'dkleeailh'
 # API_KEY = '171326873511271'
@@ -253,3 +249,8 @@ EMAIL_USE_TLS = True  # Sử dụng TLS
 EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
+
+PAYOS_CLIENT_ID = '8beadbae-a0e7-4923-b5e9-f49fcadd3ca4'
+PAYOS_API_KEY = '760cfb21-3d78-428e-b556-3a41060d8a42'
+PAYOS_CHECKSUM_KEY = '43588c53ec34ac56749988368dbdac4c7fed5f512aafc1941c61da712ecef7a9'
+PAYOS_API_URL = 'https://payosapi.com/transaction'  

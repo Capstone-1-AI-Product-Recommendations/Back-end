@@ -1,8 +1,7 @@
 from django.urls import path
-from .views import cod_payment, zalopay_payment, zalopay_callback
+from .views import process_payment, payment_cod
 
 urlpatterns = [
-    path('payments/cod/<int:order_id>/', cod_payment, name='cod_payment'),
-    path('payments/zalopay/<int:order_id>/', zalopay_payment, name='zalopay_payment'),
-    path('payments/zalopay_callback/<int:order_id>/', zalopay_callback, name='zalopay_callback'),
+    path('process_payment/<int:user_id>/<int:order_id>/', process_payment, name='process_payment'),
+    path('payment/cod/<int:user_id>/<int:order_id>/', payment_cod, name='payment_cod')
 ]

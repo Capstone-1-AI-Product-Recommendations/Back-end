@@ -3,46 +3,46 @@ from rest_framework.decorators import api_view
 from rest_framework import status
 from web_backend.models import Order, OrderItem, CartItem, ShippingAddress, User
 from .serializers import OrderSerializer, ShippingAddressSerializer
+import json
 
 @api_view(['GET', 'POST'])
 def create_order(request, user_id):
-    # Lấy thông tin người dùng
     try:
         user = User.objects.get(user_id=user_id)
     except User.DoesNotExist:
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        # Lấy thông tin nhận hàng từ bảng ShippingAddress nếu có, hoặc thông tin mặc định từ bảng User
         try:
             shipping_address = user.shipping_address
         except ShippingAddress.DoesNotExist:
-            # Nếu không có thông tin nhận hàng, lấy thông tin mặc định từ bảng User
             shipping_address = ShippingAddress(
                 recipient_name=user.full_name,
                 recipient_phone=user.phone_number,
                 recipient_address=user.address
             )
-
-        # Sử dụng serializer để trả về thông tin nhận hàng
         serializer = ShippingAddressSerializer(shipping_address)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
-        # Lấy danh sách cart_item_ids từ yêu cầu
-        cart_item_ids = request.data.get('cart_item_ids', [])
+        # Lấy cart_item_ids và chuyển chuỗi JSON thành danh sách
+        cart_item_ids_str = request.data.get('cart_item_ids', '[]')  # Mặc định là chuỗi rỗng nếu không có
+        try:
+            cart_item_ids = json.loads(cart_item_ids_str)  # Chuyển chuỗi JSON thành danh sách
+        except json.JSONDecodeError:
+            return Response({"error": "Dữ liệu cart_item_ids không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
         if not cart_item_ids:
             return Response({"error": "Cần phải chọn ít nhất một sản phẩm."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Kiểm tra sự tồn tại của CartItems và tạo đơn hàng
         cart_items = CartItem.objects.filter(cart_item_id__in=cart_item_ids, cart__user=user)
         if not cart_items.exists():
             return Response({"error": "Không tìm thấy sản phẩm trong giỏ hàng."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Tạo đơn hàng mới
+        # Tiến hành tạo đơn hàng
         order = Order.objects.create(
             user=user,
-            total=0,  # Tổng tiền sẽ được tính sau
+            total=0,
             status='Pending',
         )
 
@@ -53,27 +53,21 @@ def create_order(request, user_id):
             price = product.price
             total_amount += price * quantity
 
-            # Tạo OrderItem cho mỗi sản phẩm trong đơn hàng
             OrderItem.objects.create(
                 order=order,
                 product=product,
                 quantity=quantity,
-                price = price * quantity,
+                price=price * quantity,
             )
 
-        # Cập nhật tổng tiền của đơn hàng
         order.total = total_amount
         order.save()
-
-        # Xóa các CartItem sau khi tạo OrderItem
         cart_items.delete()
 
-        # Thông tin nhận hàng (có thể thay đổi)
         recipient_name = request.data.get('recipient_name', user.full_name)
         recipient_phone = request.data.get('recipient_phone', user.phone_number)
         recipient_address = request.data.get('recipient_address', user.address)
 
-        # Tạo hoặc cập nhật thông tin nhận hàng trong bảng ShippingAddress
         shipping_address, created = ShippingAddress.objects.update_or_create(
             user=user,
             defaults={
@@ -83,10 +77,9 @@ def create_order(request, user_id):
             }
         )
 
-        # Trả về thông tin đơn hàng
         order_serializer = OrderSerializer(order)
         return Response(order_serializer.data, status=status.HTTP_201_CREATED)
-    
+
 @api_view(['PUT'])
 def update_shipping_address(request, user_id):
     # Lấy thông tin người dùng

@@ -40,3 +40,4 @@ scipy
 opencv-python
 imageio[ffmpeg]
 python-decouple
+payos
