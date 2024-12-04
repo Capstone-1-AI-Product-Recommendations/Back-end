@@ -1,5 +1,5 @@
 import mysql.connector
-db = mysql.connector.connect(user='root', password='nhc171103', host='localhost', database='web_backend')
+db = mysql.connector.connect(user='root', password='nhc171103', host='localhost', database='capstone_1')
 # RUN
 mycursor = db.cursor()
 

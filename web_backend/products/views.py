@@ -1,5 +1,4 @@
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 # from web_backend.models import Product, Ad
@@ -9,6 +8,10 @@ from django.shortcuts import render
 # from .models import Product, Category, Comment, User
 from web_backend.models import *
 from .serializers import ProductSerializer, CommentSerializer, CategorySerializer
+from web_backend.models import Product, User, Category, Comment, ShopInfo, Shop
+from .serializers import DetailProductSerializer, CRUDProductSerializer, ProductSerializer, CommentSerializer, CategorySerializer, DetailCommentSerializer
+from django.db.models import Prefetch
+from django.shortcuts import render
 from users.serializers import UserSerializer
 from django.db.models import Count
 import random
@@ -20,35 +23,85 @@ from recommendations.views import get_recommended_products
 
 # API to retrieve product details by product ID
 @api_view(['GET'])
-def product_detail(request, product_id):
+def product_detail(request, user_id, product_id):
     try:
         product = Product.objects.select_related('category', 'seller') \
                                   .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set') \
-                                  .get(product_id=product_id)
+                                  .get(product_id=product_id)        
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    serializer = ProductSerializer(product)
+    serializer = DetailProductSerializer(product)
     return Response(serializer.data)
 
 # API to create a new product
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])
-def create_product(request):
-    serializer = CRUDProductSerializer(data=request.data)
+def create_product(request, seller_id, shop_info_id):
+    try:
+        # Kiểm tra seller_id hợp lệ và là người bán
+        seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Only sellers can create products."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+    # Kiểm tra shopinfo_id hợp lệ và lấy ShopInfo
+    try:
+        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
+        shop = shop_info.shop
+    except ShopInfo.DoesNotExist:
+        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
+    # Sao chép dữ liệu request.data thành một dict có thể sửa đổi
+    data = request.data.copy()
+    data['seller'] = seller_id  # Truyền seller_id vào request data
+    # Khởi tạo serializer để tạo sản phẩm
+    serializer = CRUDProductSerializer(data=data)
     if serializer.is_valid():
-        product = serializer.save()
+        # Lưu sản phẩm và gán seller
+        product = serializer.save(seller=seller)
+        # Cập nhật số lượng sản phẩm trong ShopInfo
+        shop_info.product_count += 1
+        shop_info.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # API to update a product by product ID
 @api_view(['PUT'])
-@parser_classes([MultiPartParser, FormParser])
-def update_product(request, product_id):
+def update_product(request, seller_id, shop_info_id, product_id):
+    # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
-        product = Product.objects.get(pk=product_id)
+        seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Only sellers can update products."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+    try:
+        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
+        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
+    except ShopInfo.DoesNotExist:
+        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
+    # Truy xuất sản phẩm cần cập nhật thông qua mối quan hệ với User (seller)
+    try:
+        # Kiểm tra sản phẩm có thuộc về seller hay không
+        product = Product.objects.get(product_id=product_id, seller=seller)        
+        # Kiểm tra sản phẩm có thuộc về shop tương ứng hay không
+        if product.seller == seller:  # Kiểm tra seller của sản phẩm
+            # Cập nhật sản phẩm (ví dụ: cập nhật tên sản phẩm và giá trị mới từ request)
+            product_name = request.data.get('name', product.name)
+            product_price = request.data.get('price', product.price)
+            product_quantity = request.data.get('quantity', product.quantity)
+            product_description = request.data.get('description', product.description)
+            # Lưu các thay đổi
+            product.name = product_name
+            product.price = product_price
+            product.quantity = product_quantity
+            product.description = product_description
+            product.save()
+            return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
 
     serializer = CRUDProductSerializer(product, data=request.data, partial=True)
     if serializer.is_valid():
@@ -56,16 +109,37 @@ def update_product(request, product_id):
         return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# API to delete a product by product ID
 @api_view(['DELETE'])
-def delete_product(request, product_id):
+def delete_product(request, seller_id, shop_info_id, product_id):
+    # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
-        product = Product.objects.get(pk=product_id)
+        seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Only sellers can delete products."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
+    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+    try:
+        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
+        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
+    except ShopInfo.DoesNotExist:
+        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
+    # Kiểm tra sản phẩm có thuộc về seller và shop hay không
+    try:
+        product = Product.objects.get(product_id=product_id, seller=seller)
+        if product.seller == seller:
+            # Giảm số lượng sản phẩm trong ShopInfo
+            if shop_info.product_count > 0:
+                shop_info.product_count -= 1
+                shop_info.save()
+            # Xóa sản phẩm
+            product.delete()
+            return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    product.delete()
-    return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])

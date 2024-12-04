@@ -64,6 +64,18 @@ INSTALLED_APPS = [
     'web_backend',
 ]
 
+MIGRATION_MODULES = {
+    'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
+    'sessions': None,  # Ngừng tạo bảng cho 'sessions'
+    'admin': None,  # Ngừng tạo bảng cho 'admin'
+    'messages': None,  # Ngừng tạo bảng cho 'messages'
+    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
+    # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
+    'authtoken': None,  # Ngừng tạo bảng 'authtoken'
+    'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
+    'socialaccount': None,  # Ngừng tạo bảng 'socialaccount' nếu bạn không dùng Social Authentication
+    'social_django': None,
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -75,8 +87,13 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     'allauth.account.middleware.AccountMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'web_backend.middleware.UserActivityLoggingMiddleware',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Add your frontend URL here
+]
 
 ROOT_URLCONF = "web_backend.urls"
 
@@ -214,6 +231,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.JSONParser',
     ],
 }
 
@@ -247,3 +265,4 @@ EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
 
+JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'

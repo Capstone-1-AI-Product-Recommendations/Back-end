@@ -3,8 +3,11 @@ from web_backend.models import Product, ProductRecommendation, ProductAd, Commen
 from users.serializers import UserSerializer
 from cloudinary.uploader import upload as cloudinary_upload
 from web_backend.utils import compress_and_upload_image, compress_and_upload_video
+import requests
 from django.core.files.base import ContentFile
-
+from rest_framework.response import Response
+from rest_framework import status
+from django.db import transaction
 
 # Serializer for Category model
 class CategorySerializer(serializers.ModelSerializer):
@@ -38,16 +41,6 @@ class ProductAdSerializer(serializers.ModelSerializer):
         fields = ['ad_title']
 
 
-# Serializer for Comment model
-class CommentSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='user.username', read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-
-    class Meta:
-        model = Comment
-        fields = ['user', 'comment', 'rating', 'created_at']
-
-
 # Serializer for ProductImage model
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,28 +53,6 @@ class ProductVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVideo
         fields = ['file', 'product']
-
-
-# Serializer for Product model
-class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
-    subcategory = SubcategorySerializer(read_only=True)
-    seller = serializers.CharField(source='seller.username', read_only=True)
-    recommendations = ProductRecommendationSerializer(
-        source='productrecommendation_set', many=True, read_only=True
-    )
-    ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
-    comments = CommentSerializer(source='comment_set', many=True, read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True)
-    videos = ProductVideoSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Product
-        fields = [
-            'product_id', 'name', 'price', 'category', 'subcategory', 'description',
-            'seller', 'images', 'videos', 'quantity', 'recommendations', 'ads', 'comments',
-            'color', 'brand', 'stock_status'
-        ]
 
 
 # Serializer for CRUD Product operations
@@ -101,6 +72,106 @@ class CRUDProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['name', 'price', 'category', 'subcategory', 'description', 'seller', 'quantity', 'color', 'brand', 'stock_status', 'images', 'videos']
 
+# Serializer cho Comment
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = [
+            'comment_id',
+            'user',
+            'product',
+            'comment',
+            'rating',
+            'created_at'
+        ]
+        
+class DetailCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['user', 'comment', 'rating', 'created_at']
+        
+# Serializer for Comment model
+class CommentSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source='user.username', read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ['user', 'comment', 'rating', 'created_at']
+
+class ProductRecommendationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductRecommendation
+        fields = ['user', 'description']
+class ProductAdSerializer(serializers.ModelSerializer):
+    ad_title = serializers.CharField(source='ad.title', read_only=True)
+    class Meta:
+        model = ProductAd
+        fields = ['ad_title']  
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ['file']
+class ProductVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVideo
+        fields = ['file']
+class DetailProductSerializer(serializers.ModelSerializer):
+    category = serializers.CharField(source='category.category_name', allow_null=True)
+    seller = serializers.CharField(source='seller.username', read_only=True)
+    recommendations = ProductRecommendationSerializer(
+        source='productrecommendation_set', many=True, read_only=True
+    )
+    ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
+    comments = DetailCommentSerializer(source='comment_set', many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    videos = ProductVideoSerializer(many=True, read_only=True)
+    class Meta:
+        model = Product
+        fields = [
+            'name', 'price', 'category', 'description', 'seller', 'images', 'videos',
+            'quantity', 'recommendations', 'ads', 'comments'
+        ]
+
+class ProductSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    subcategory = SubcategorySerializer(read_only=True)
+    seller = serializers.CharField(source='seller.username', read_only=True)
+    recommendations = ProductRecommendationSerializer(
+        source='productrecommendation_set', many=True, read_only=True
+    )
+    ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
+    comments = CommentSerializer(source='comment_set', many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    videos = ProductVideoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'product_id', 'name', 'price', 'category', 'subcategory', 'description',
+            'seller', 'images', 'videos', 'quantity', 'recommendations', 'ads', 'comments',
+            'color', 'brand', 'stock_status'
+        ]
+class CRUDProductSerializer(serializers.ModelSerializer):
+    seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=True)
+    images = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False
+    )
+    videos = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False
+    )
+
+    class Meta:
+        model = Product
+        fields = ['name', 'price', 'category', 'description', 'seller', 'quantity', 'images', 'videos']
+
+    def validate(self, attrs):
+        seller = attrs.get('seller')
+        if seller.role.role_name != "Seller":
+            raise serializers.ValidationError("Only sellers can create products.")
+        return attrs
+    
     def create(self, validated_data):
         images = validated_data.pop('images', [])
         videos = validated_data.pop('videos', [])

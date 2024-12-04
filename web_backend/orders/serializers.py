@@ -13,14 +13,9 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()  # Assuming 'user' is a foreign key to the User model
-    total = serializers.DecimalField(max_digits=10, decimal_places=2)
-
     class Meta:
         model = Order
-        fields = ['order_id', 'user', 'status', 'total', 'created_at', 'updated_at']
-        read_only_fields = ['order_id', 'created_at', 'updated_at']
-
+        fields = ['order_id', 'user', 'status', 'total', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Order
 
 class OrderItemSerializer(serializers.ModelSerializer):
     order = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())  # Assuming you link to an Order
@@ -33,11 +28,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['order_item_id']
 
 
-class CartSerializer(serializers.ModelSerializer):
+class ShippingAddressSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField()  # Assuming 'user' is a foreign key to the User model
     items = CartItemSerializer(source='cartitem_set', many=True)  # Nested CartItemSerializer for each Cart item
 
     class Meta:
         model = Cart
-        fields = ['cart_id', 'user', 'created_at', 'updated_at', 'items']
-        read_only_fields = ['cart_id', 'created_at', 'updated_at']
+        fields = ['cart_id', 'user', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Cart
+
+class CartItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CartItem
+        fields = ['cart_item_id', 'cart', 'product', 'quantity', 'added_at']  # Cập nhật các trường cho phù hợp với model CartItem
