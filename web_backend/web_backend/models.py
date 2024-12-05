@@ -23,17 +23,6 @@ class Ad(models.Model):
         db_table = 'ad'
 
 
-class AdView(models.Model):
-    ad_view_id = models.AutoField(primary_key=True)
-    viewed_at = models.DateTimeField(blank=True, null=True)
-    ad = models.ForeignKey(Ad, models.DO_NOTHING)
-    user = models.ForeignKey('User', models.DO_NOTHING)
-
-    class Meta:
-        managed = False
-        db_table = 'ad_view'
-
-
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)
     created_at = models.DateTimeField(blank=True, null=True)
@@ -78,6 +67,17 @@ class Comment(models.Model):
     class Meta:
         managed = False
         db_table = 'comment'
+
+
+class DjangoMigrations(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    app = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    applied = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'django_migrations'
 
 
 class Notification(models.Model):
@@ -137,16 +137,16 @@ class Product(models.Model):
     product_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=15, decimal_places=2)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField()
-    category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
-    seller = models.ForeignKey('User', models.DO_NOTHING, blank=True, null=True)
     subcategory = models.ForeignKey('Subcategory', models.DO_NOTHING, blank=True, null=True)
     is_featured = models.IntegerField(blank=True, null=True)
     color = models.CharField(max_length=100, blank=True, null=True)
     brand = models.CharField(max_length=100, blank=True, null=True)
+    detail_product = models.TextField(blank=True, null=True)
+    shop = models.ForeignKey('Shop', models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -178,7 +178,7 @@ class ProductRecommendation(models.Model):
     session_id = models.CharField(max_length=255)
     recommended_at = models.DateTimeField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
+    category_id = models.IntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, models.DO_NOTHING)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
@@ -255,10 +255,10 @@ class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
     password = models.CharField(max_length=255)
-    email = models.CharField(unique=True, max_length=100)
+    email = models.CharField(unique=True, max_length=100, blank=True, null=True)
     full_name = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
-    phone_number = models.CharField(max_length=20, null=True)
+    phone_number = models.CharField(max_length=30, blank=True, null=True)
     reset_token = models.CharField(max_length=50, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
