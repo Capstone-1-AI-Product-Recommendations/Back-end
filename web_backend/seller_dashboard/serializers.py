@@ -21,14 +21,14 @@ class AdSerializer(serializers.ModelSerializer):
         # Ensure fields match the Ad model
 
 # AdView Serializer
-class AdViewSerializer(serializers.ModelSerializer):
-    user = UserSerializer()  # Serialize user object as well, if needed
-    ad = AdSerializer()  # Serialize the Ad object
-
-    class Meta:
-        model = AdView
-        fields = ['ad_view_id', 'user', 'ad', 'viewed_at']
-        # Ensure fields match the AdView model
+# class AdViewSerializer(serializers.ModelSerializer):
+#     user = UserSerializer()  # Serialize user object as well, if needed
+#     ad = AdSerializer()  # Serialize the Ad object
+#
+#     class Meta:
+#         model = AdView
+#         fields = ['ad_view_id', 'user', 'ad', 'viewed_at']
+#         # Ensure fields match the AdView model
 
 # ProductAd Serializer
 class ProductAdSerializer(serializers.ModelSerializer):

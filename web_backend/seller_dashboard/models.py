@@ -17,17 +17,6 @@
 #         db_table = 'ad'  # Tên bảng trong cơ sở dữ liệu
 #
 #
-# class AdView(models.Model):
-#     ad_view_id = models.AutoField(primary_key=True)  # ID lượt xem quảng cáo
-#     viewed_at = models.DateTimeField(auto_now_add=True)  # Thời gian xem
-#     ad = models.ForeignKey('Ad', on_delete=models.CASCADE)  # Liên kết với bảng Ad
-#     user = models.ForeignKey('users.User', on_delete=models.CASCADE)  # Liên kết với bảng User
-#
-#     class Meta:
-#         managed = False  # Django không quản lý bảng này
-#         db_table = 'ad_view'  # Tên bảng trong cơ sở dữ liệu
-#
-#
 # class SellerProfile(models.Model):
 #     seller_id = models.CharField(primary_key=True, max_length=50)  # ID người bán
 #     store_name = models.CharField(max_length=255, blank=True, null=True)  # Tên cửa hàng

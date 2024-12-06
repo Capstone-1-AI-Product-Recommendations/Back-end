@@ -24,15 +24,15 @@ class Ad(models.Model):
         db_table = 'ad'
 
 
-class AdView(models.Model):
-    ad_view_id = models.AutoField(primary_key=True)
-    viewed_at = models.DateTimeField(auto_now_add=True)
-    ad = models.ForeignKey('Ad', on_delete=models.CASCADE)
-    user = models.ForeignKey('User', on_delete=models.CASCADE)
-
-    class Meta:
-        managed = False
-        db_table = 'ad_view'
+# class AdView(models.Model):
+#     ad_view_id = models.AutoField(primary_key=True)
+#     viewed_at = models.DateTimeField(auto_now_add=True)
+#     ad = models.ForeignKey('Ad', on_delete=models.CASCADE)
+#     user = models.ForeignKey('User', on_delete=models.CASCADE)
+#
+#     class Meta:
+#         managed = False
+#         db_table = 'ad_view'
 
 
 class Cart(models.Model):
