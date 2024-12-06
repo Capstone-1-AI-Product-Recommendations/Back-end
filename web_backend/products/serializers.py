@@ -43,6 +43,28 @@ class ProductAdSerializer(serializers.ModelSerializer):
         model = ProductAd
         fields = ['product_ad_id', 'ad_title']
 
+# # Serializer for Comment
+# class CommentSerializer(serializers.ModelSerializer):
+#     user_name = serializers.CharField(source='user.username', read_only=True)
+#     created_at = serializers.DateTimeField(read_only=True)
+
+#     class Meta:
+#         model = Comment
+#         fields = ['comment_id', 'user_name', 'comment', 'rating', 'created_at']
+
+# Serializer cho Comment
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = [
+            'comment_id',
+            'user',
+            'product',
+            'comment',
+            'rating',
+            'created_at'
+        ]
+# Serializer for ProductImage model
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
@@ -54,6 +76,7 @@ class ProductVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVideo
         fields = ['id', 'file']
+
 
 # Serializer for Product
 class ProductSerializer(serializers.ModelSerializer):
@@ -90,30 +113,8 @@ class CRUDProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ['name', 'price', 'category', 'subcategory', 'description', 'seller', 'quantity', 'color', 'brand', 'stock_status', 'images', 'videos']
-
-# Serializer cho Comment
-class CommentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = [
-            'comment_id',
-            'user',
-            'product',
-            'comment',
-            'rating',
-            'created_at'
-        ]
         
 class DetailCommentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = ['user', 'comment', 'rating', 'created_at']
-        
-# Serializer for Comment model
-class CommentSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='user.username', read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-
     class Meta:
         model = Comment
         fields = ['user', 'comment', 'rating', 'created_at']
