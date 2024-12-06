@@ -25,3 +25,4 @@ admin.site.register(CartItem)
 admin.site.register(Cart)
 # admin.site.register(AdView)
 admin.site.register(Ad)
+

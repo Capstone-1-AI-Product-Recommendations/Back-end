@@ -1,8 +1,11 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
+
 from .serializers import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer
 # from web_backend.models import Role, User, UserBankAccount
+from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
+from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt
@@ -18,15 +21,37 @@ from rest_framework.response import Response
 from .decorators import admin_required
 # from .models import User, Role
 from web_backend.models import *
+import jwt
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.shortcuts import render
+from rest_framework.response import Response
+# from rest_framework.views import APIView
+# from rest_framework.permissions import IsAdminUser
+# from .decorators import admin_required
+# from .models import User, Role
+# from .serializers import UserSerializer
+
 
 # Register User
 @csrf_exempt
 @api_view(['POST'])
 def register(request):
     if request.method == 'POST':
-        serializer = UserSerializer(data=request.data)
+        serializer = RegisUserSerializer(data=request.data)  # Khởi tạo serializer với dữ liệu yêu cầu        
+
         if serializer.is_valid():
-            # Handle password
+            # Kiểm tra email
+            email = serializer.validated_data.get('email')
+            try:
+                validate_email(email)  # Kiểm tra định dạng email
+            except ValidationError:
+                return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Kiểm tra xem email đã tồn tại chưa
+            if User.objects.filter(email=email).exists():
+                return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
+            # Xử lý mật khẩu
             password = serializer.validated_data.get('password')
             if password:
                 hashed_password = make_password(password)
@@ -43,13 +68,17 @@ def register(request):
             user.save()
             # Send email with verification link
             verification_link = f"http://127.0.0.1:8000/api/verify_email/?token={verification_token}"
-            send_mail(
-                subject="Verify Your Email",
-                message=f"Hi {user.username},\n\nPlease verify your email by clicking the link below:\n{verification_link}\n\nThank you!",
-                from_email=settings.EMAIL_HOST_USER,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
+            try:
+                send_mail(
+                    subject="Verify Your Email",
+                    message=f"Hi {user.username},\n\nPlease verify your email by clicking the link below:\n{verification_link}\n\nThank you!",
+                    from_email=settings.EMAIL_HOST_USER,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                user.delete()  # Xóa người dùng nếu gửi email thất bại
+                return Response({"error": f"Failed to send verification email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response(
                 {"message": "User registered successfully. A verification email has been sent."},
                 status=status.HTTP_201_CREATED
@@ -109,8 +138,8 @@ def logout_view(request):
         return response
     return Response({"error": "User not authenticated"}, status=status.HTTP_400_BAD_REQUEST)
 
-
 # Google Sign-Up View to generate Google OAuth login URL
+
 @api_view(['POST'])
 def GoogleSignUpView(request):
     if request.method == 'POST':
@@ -255,6 +284,9 @@ def update_user(request):
     user_id = request.data.get('user_id')  # Get `user_id` from request data
     if not user_id:
         return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+def update_user(request, user_id):
+
     try:
         # Retrieve the user with the provided user_id
         user = User.objects.get(user_id=user_id)
@@ -263,6 +295,15 @@ def update_user(request):
         fields_to_update = ['full_name', 'email', 'phone_number', 'address']
         for field in fields_to_update:
             if field in request.data:
+                if field == 'email':  # Kiểm tra email
+                    email = request.data[field]
+                    try:
+                        validate_email(email)  # Kiểm tra định dạng email
+                    except ValidationError:
+                        return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+                    # Kiểm tra xem email đã được sử dụng chưa
+                    if User.objects.filter(email=email).exclude(user_id=user_id).exists():
+                        return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
                 setattr(user, field, request.data[field])
 
         # Save the updated user information
@@ -287,6 +328,7 @@ def update_user(request):
         return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # Get User Bank Accounts View
@@ -376,3 +418,80 @@ class AdminUserRoleUpdateView(APIView):
         user.role = role
         user.save()
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST'])
+def user_bank_accounts_list_create(request, user_id):
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        accounts = UserBankAccount.objects.filter(user=user)
+        serializer = UserBankAccountSerializer(accounts, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = UserBankAccountSerializer(data=request.data, context={'user': user})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+# Chi tiết, cập nhật hoặc xóa tài khoản ngân hàng
+@api_view(['GET', 'PUT', 'DELETE'])
+def user_bank_account_detail(request, user_id, bank_account_id):
+    try:
+        user = User.objects.get(pk=user_id)
+        account = UserBankAccount.objects.get(pk=bank_account_id, user=user)
+    except (User.DoesNotExist, UserBankAccount.DoesNotExist):
+        return Response({"error": "User or Bank Account not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = UserBankAccountSerializer(account)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = UserBankAccountSerializer(account, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        account.delete()
+        return Response({"message": "Bank account deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+def get_user_behavior(request, user_id):
+    behaviors = UserBrowsingBehavior.objects.filter(user_id=user_id).order_by('-timestamp')
+    if behaviors.exists():
+        serializer = UserBrowsingBehaviorSerializer(behaviors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response({"detail": "No browsing behavior found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+# Admin có thể thay đổi role của người dùng thành "seller" hoặc ngược lại.
+# class AdminUserRoleUpdateView(APIView):
+#     permission_classes = [IsAdminUser]
+
+#     def put(self, request, user_id):
+#         try:
+#             # Tìm người dùng cần cập nhật
+#             user = User.objects.get(user_id=user_id)
+#             # Kiểm tra Role
+#             role_id = request.data.get('role_id')
+
+#             if not role_id:
+#                 return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+#             # Tìm kiếm Role
+#             try:
+#                 role = Role.objects.get(role_id=role_id)
+#             except Role.DoesNotExist:
+#                 return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
+#             # Cập nhật vai trò người dùng
+#             user.role = role
+#             user.save()
+#             return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+#         except User.DoesNotExist:
+#             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)

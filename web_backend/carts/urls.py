@@ -12,8 +12,6 @@ urlpatterns = [
     path('cart/update/<int:user_id>/', update_cart_item, name='update_cart_item'),
 
     # Remove a product from the cart by cart_item_id
-    path('cart/remove/<int:cart_item_id>/', remove_from_cart, name='remove_from_cart'),
-
-    # Clear the entire cart for a specific user
+    path('cart/remove/<int:user_id>/<int:cart_item_id>/', remove_from_cart, name='remove_from_cart'),
     path('cart/clear/<int:user_id>/', clear_cart, name='clear_cart'),
 ]
