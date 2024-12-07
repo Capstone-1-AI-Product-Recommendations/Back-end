@@ -131,7 +131,6 @@ class Payment(models.Model):
         managed = False
         db_table = 'payment'
 
-
 class Product(models.Model):
     product_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
@@ -141,17 +140,21 @@ class Product(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField()
     subcategory = models.ForeignKey('Subcategory', models.DO_NOTHING, blank=True, null=True)
-    is_featured = models.IntegerField(blank=True, null=True)
+    is_featured = models.BooleanField(default=False)  # Sửa thành BooleanField
     color = models.CharField(max_length=100, blank=True, null=True)
     brand = models.CharField(max_length=100, blank=True, null=True)
     rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
-    detail_product = models.TextField(blank=True, null=True)
-    detail_product = models.TextField(blank=True, null=True)
     shop = models.ForeignKey('Shop', models.DO_NOTHING, blank=True, null=True)
+    promotion_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Thêm trường này
+    event_id = models.IntegerField(blank=True, null=True)  # Thêm trường này
 
     class Meta:
         managed = False
         db_table = 'product'
+
+    @property
+    def ads(self):
+        return self.productad_set.all()  # Quan hệ reverse với `ProductAd`
 
     @property
     def stock_status(self):
@@ -163,6 +166,17 @@ class Product(models.Model):
         """
         average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
         return round(average_rating, 1) if average_rating else 0
+
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+
+@receiver(pre_save, sender=Product)
+def update_is_featured(sender, instance, **kwargs):
+    # Kiểm tra các tiêu chí: có giá khuyến mãi, thuộc sự kiện, hoặc được quảng cáo
+    if instance.promotion_price or instance.event_id or instance.ads.exists():
+        instance.is_featured = True
+    else:
+        instance.is_featured = False
 
 class ProductAd(models.Model):
     product_ad_id = models.AutoField(primary_key=True)
