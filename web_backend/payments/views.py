@@ -11,7 +11,8 @@ from payos.type import PaymentData, ItemData
 import hashlib
 from django.shortcuts import get_object_or_404
 from decimal import Decimal
-from .serializers import OrderCODResponseSerializer
+from .serializers import OrderCODResponseSerializer, OrderSerializer, OrderItemSerializer
+from web_backend.utils import transfer_funds
 
 # Khởi tạo đối tượng PayOS
 payOS = PayOS(
@@ -161,3 +162,72 @@ def payment_cod(request, user_id, order_id):
 
         # Serialize dữ liệu và trả về response
         return Response(response_data, status=status.HTTP_201_CREATED)
+    
+@api_view(['GET', 'POST'])
+def process_transfer(request, admin_id, order_id, seller_id):
+    # Kiểm tra user hiện tại có phải admin hay không
+    try:
+        admin = User.objects.get(user_id=admin_id)
+        if not admin.role or admin.role.role_name != "Admin":
+            return Response({"detail": "Only admins can perform this action."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Admin not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        # Lấy thông tin đơn hàng
+        order = Order.objects.get(order_id=order_id)
+    except Order.DoesNotExist:
+        return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy seller từ seller_id được truyền vào URL
+    try:
+        seller = User.objects.get(user_id=seller_id)
+        if not seller.role or seller.role.role_name != "Seller":
+            return Response({"detail": "Seller not found or invalid role."}, status=status.HTTP_404_NOT_FOUND)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy danh sách các sản phẩm trong đơn hàng thuộc về seller này
+    order_items = OrderItem.objects.filter(order=order, product__seller=seller)
+
+    # Tính toán tổng tiền seller nhận được
+    total_amount = sum(item.price * item.quantity for item in order_items)
+
+    # Chuyển 0.95 thành Decimal để tránh lỗi kiểu dữ liệu
+    net_amount = total_amount * Decimal('0.95')  # Admin giữ lại 5%
+
+    try:
+        # Lấy thông tin tài khoản ngân hàng của seller
+        bank_account = UserBankAccount.objects.get(user=seller)
+    except UserBankAccount.DoesNotExist:
+        return Response({"detail": "Bank account not found for seller."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Nếu phương thức là GET: trả về thông tin về transfer
+    if request.method == 'GET':
+        transfer_details = {
+            "seller_name": seller.username,
+            "seller_bank_name": bank_account.bank_name,
+            "seller_account_number": bank_account.account_number,
+            "total_amount": str(total_amount),  # Chuyển Decimal thành str
+            "net_amount": str(net_amount),      # Chuyển Decimal thành str
+            "order_items": [{"product": item.product.name, "quantity": item.quantity, "price": str(item.price)} for item in order_items]
+        }
+        return Response(transfer_details)
+
+    # Nếu phương thức là POST: thực hiện chuyển tiền
+    elif request.method == 'POST':
+        # Thực hiện chuyển tiền qua PayOS
+        try:
+            response = transfer_funds(
+                bank_name=bank_account.bank_name,
+                account_number=bank_account.account_number,
+                account_holder_name=bank_account.account_holder_name,
+                amount=net_amount,
+                description=f"Payment for order {order.order_id}"
+            )
+            if response.status_code == 200:
+                return Response({"detail": "Transfer completed successfully."})
+            else:
+                return Response({"detail": f"Transfer failed: {response.json().get('message', 'Unknown error')}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

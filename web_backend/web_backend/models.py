@@ -268,7 +268,7 @@ class UserBankAccount(models.Model):
     account_number = models.CharField(max_length=20)
     account_holder_name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=50, blank=True, null=True)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    user = models.ForeignKey(User, models.DO_NOTHING, unique=True)
 
     class Meta:
         managed = False
