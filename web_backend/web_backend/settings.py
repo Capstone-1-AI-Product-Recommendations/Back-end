@@ -140,7 +140,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone_1',
+        'NAME': 'capstone1',
         'USER': 'root',
         'PASSWORD': 'nhc171103',
         'HOST': 'localhost',
@@ -254,3 +254,4 @@ PAYOS_CLIENT_ID = '8beadbae-a0e7-4923-b5e9-f49fcadd3ca4'
 PAYOS_API_KEY = '760cfb21-3d78-428e-b556-3a41060d8a42'
 PAYOS_CHECKSUM_KEY = '43588c53ec34ac56749988368dbdac4c7fed5f512aafc1941c61da712ecef7a9'
 PAYOS_API_URL = 'https://payosapi.com/transaction'  
+

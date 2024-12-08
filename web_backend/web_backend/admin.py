@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Role, User, Category, Product, Order, OrderItem, Cart, CartItem, Ad, ProductAd, Notification, Comment, UserBrowsingBehavior, ProductRecommendation, Payment, ProductImage, ProductVideo, UserBankAccount, Shop, ShopInfo, Subcategory, ShippingAddress
+from .models import SellerProfile, Role, User, Category, Product, Order, OrderItem, Cart, CartItem, Ad, ProductAd, Notification, Comment, UserBrowsingBehavior, ProductRecommendation, Payment, ProductImage, ProductVideo, UserBankAccount, Shop, ShopInfo, Subcategory, ShippingAddress
 # Register your models here.
 
 admin.site.register(Role)
@@ -24,3 +24,4 @@ admin.site.register(Shop)
 admin.site.register(ShopInfo)
 admin.site.register(Subcategory)
 admin.site.register(ShippingAddress)
+admin.site.register(SellerProfile)

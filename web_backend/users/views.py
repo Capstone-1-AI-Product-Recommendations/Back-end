@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
 from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
-from web_backend.models import VerificationCode, Role, User, UserBankAccount, UserBrowsingBehavior
+from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
 import jwt, requests
@@ -276,7 +276,7 @@ def verify_reset_code(request):
         user = User.objects.get(email=email.lower().strip())
         return Response({"detail": "Verification successful, you can now reset your password.", "redirect_url": "http://127.0.0.1:8000/api/new_password/"}, status=status.HTTP_200_OK)
     
-    except VerificationCode.DoesNotExist:
+    except User.DoesNotExist:
         return Response({"error": "User not found with the provided email."}, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['POST'])
