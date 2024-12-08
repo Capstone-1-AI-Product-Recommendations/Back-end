@@ -1,6 +1,6 @@
-# recommendations/serializers.py
 from rest_framework import serializers
-from .models import ProductRecommendation
+# from .models import ProductRecommendation
+from web_backend.models import *
 from products.serializers import ProductSerializer, CategorySerializer
 
 class ProductRecommendationSerializer(serializers.ModelSerializer):
@@ -12,7 +12,13 @@ class ProductRecommendationSerializer(serializers.ModelSerializer):
         fields = ['recommendation_id', 'user', 'product', 'category', 'recommended_at']
 
     def get_product(self, obj):
-        return ProductSerializer(obj.product).data
+        # Check if the product exists and serialize it
+        if obj.product:
+            return ProductSerializer(obj.product).data
+        return None  # If no product exists, return None
 
     def get_category(self, obj):
-        return CategorySerializer(obj.category).data if obj.category else None
+        # Check if the category exists and serialize it
+        if obj.category:
+            return CategorySerializer(obj.category).data
+        return None  # If no category exists, return None

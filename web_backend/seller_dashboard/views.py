@@ -1,6 +1,9 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
+from .serializers import ProductSerializer, AdSerializer, ProductAdSerializer, SellerProfileSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
+from orders.serializers import OrderSerializer, OrderItemSerializer
 from web_backend.models import ShopInfo, Shop, User, Product, Order, OrderItem, Ad, ProductAd, Notification, Comment, ProductRecommendation
 from .serializers import ShopInfoSerializer, ShopSerializer, ProductSerializer, OrderSerializer, OrderItemSerializer, AdSerializer, ProductAdSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
 # seller_dashboard/views.py
@@ -12,6 +15,7 @@ from users.decorators import seller_required
 # from .serializers import AdSerializer, ProductSerializer, 
 # from .models import Ad, ProductAd
 # from products.models import Product
+
 
 # Quản lý đơn hàng
 @api_view(['GET'])
@@ -93,17 +97,11 @@ def update_order_status(request, order_item_id, seller_id):
 
 @api_view(['POST'])
 def create_shop(request, seller_id):
-    # Kiểm tra seller_id có phải là một seller hợp lệ không
-    try:
-        seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
-            return Response({"detail": "Only sellers can create shop."}, status=status.HTTP_403_FORBIDDEN)
-    except User.DoesNotExist:
-        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
     # Thêm seller vào validated_data trước khi tạo sản phẩm
     request.data['seller'] = seller_id  # Truyền seller_id vào request data
     # Kiểm tra dữ liệu shop
     serializer = ShopSerializer(data=request.data)
+
     if serializer.is_valid():
         shop_name = serializer.validated_data.get('shop_name')
         # Tạo shop mới
@@ -157,11 +155,13 @@ def update_shop(request, seller_id, shop_id):
     # Cập nhật thông tin shop
     serializer = ShopSerializer(shop, data=request.data, partial=True)  # partial=True cho phép chỉ cập nhật một số trường
     if serializer.is_valid():
+        # Cập nhật hồ sơ người bán
         serializer.save()  # Lưu các thay đổi vào cơ sở dữ liệu
         return Response({
             "message": "Shop updated successfully",
             "shop": serializer.data
-        }, status=status.HTTP_200_OK)    
+        }, status=status.HTTP_200_OK)
+    # Trả về lỗi nếu dữ liệu không hợp lệ
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
@@ -190,7 +190,6 @@ def delete_shop(request, seller_id, shop_id):
         "message": "Shop deleted successfully"
     }, status=status.HTTP_204_NO_CONTENT)
     
-# Thông báo và Quản lý Phản hồi 
 @api_view(['GET'])
 def get_notifications(request, seller_id):
     try:
@@ -366,12 +365,12 @@ def get_homepage_banners(request):
             product_ads = ProductAd.objects.filter(ad=ad)
             serialized_product_ads = ProductAdSerializer(product_ads, many=True).data
 
-            # Kết hợp thông tin quảng cáo và sản phẩm liên quan
-            ad_data = AdSerializer(ad).data
-            ad_data['related_products'] = serialized_product_ads  # Thêm sản phẩm liên quan
-            serialized_ads.append(ad_data)
+            # Kết hợp quảng cáo và thông tin sản phẩm liên quan
+            serialized_ads.append({
+                'ad': AdSerializer(ad).data,
+                'related_products': serialized_product_ads
+            })
 
         return Response(serialized_ads, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

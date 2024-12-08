@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from web_backend.models import Order, OrderItem, CartItem, ShippingAddress, User
+from web_backend.models import Order, OrderItem, CartItem, User #, ShippingAddress
 from .serializers import OrderSerializer, ShippingAddressSerializer
 import json
 

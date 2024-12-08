@@ -31,36 +31,51 @@ SITE_ID = 1
 # Application definition
 
 INSTALLED_APPS = [
-    "rest_framework",
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
-    "users",
+    # Django default apps
+    'django.contrib.sites',
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    # `sites` app cần trước các app liên quan đến allauth
+    # Third-party apps
+    'rest_framework',
+    'rest_framework.authtoken',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',  # Provider cụ thể của allauth
+    'social_django',
+    'corsheaders',
+    'cloudinary',
+    'cloudinary_storage',
+    'users',
     'carts',
     'products',
     'admin_dashboard',
     'orders',
     'payments',
     'recommendations',
-    'seller_dashboard',
-    'django.contrib.sites',           
-    'rest_framework.authtoken',
-    'dj_rest_auth',
-    "dj_rest_auth.registration",
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google', 
-    'social_django',
-    # "web_backend",
-    'corsheaders',
-    'cloudinary',
-    'cloudinary_storage',    
+    # 'seller_dashboard',     ?
     'web_backend.apps.WebBackendConfig',
 ]
+
+MIGRATION_MODULES = {
+    # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
+    # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
+    'admin': None,  # Ngừng tạo bảng cho 'admin'
+    'messages': None,  # Ngừng tạo bảng cho 'messages'
+    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
+    # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
+    'authtoken': None,  # Ngừng tạo bảng 'authtoken'
+    'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
+    'socialaccount': None,  # Ngừng tạo bảng 'socialaccount' nếu bạn không dùng Social Authentication
+    'social_django': None,
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -75,6 +90,10 @@ MIDDLEWARE = [
     'web_backend.middleware.UserActivityLoggingMiddleware',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Add your frontend URL here
+]
 
 ROOT_URLCONF = "web_backend.urls"
 
@@ -147,7 +166,7 @@ DATABASES = {
         'PORT': '3306', 
         'OPTIONS': {
             'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+    'init_command': "SET sql_mode='STRICT_TRANS_TABLES', innodb_strict_mode=1;",
         },
     }
 }
@@ -196,9 +215,6 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR,'static')
-]
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
@@ -254,4 +270,7 @@ PAYOS_CLIENT_ID = '8beadbae-a0e7-4923-b5e9-f49fcadd3ca4'
 PAYOS_API_KEY = '760cfb21-3d78-428e-b556-3a41060d8a42'
 PAYOS_CHECKSUM_KEY = '43588c53ec34ac56749988368dbdac4c7fed5f512aafc1941c61da712ecef7a9'
 PAYOS_API_URL = 'https://payosapi.com/transaction'  
+
+
+JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'
 

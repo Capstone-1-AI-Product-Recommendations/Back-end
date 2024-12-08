@@ -1,45 +1,42 @@
 from rest_framework import serializers
-# from .models import Order, OrderItem, Product, UserBankAccount
-from web_backend.models import Order, OrderItem, ShippingAddress
-# from .models import Order, OrderItem, Cart, CartItem
+from web_backend.models import Order, OrderItem, Cart, CartItem, Product
 
-# class OrderSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Order
-#         fields = ['order_id', 'user', 'status', 'total', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Order
+class CartItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name')  # Show product name in cart item
+    product_price = serializers.DecimalField(source='product.price', max_digits=10,
+                                             decimal_places=2)  # Show product price
 
-# class OrderItemSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = OrderItem
-#         fields = ['order_item_id', 'order', 'product', 'quantity', 'price']  # Cập nhật các trường cho phù hợp với model OrderItem
+    class Meta:
+        model = CartItem
+        fields = ['cart_item_id', 'cart', 'product_name', 'product_price', 'quantity', 'added_at']
+        read_only_fields = ['cart_item_id', 'added_at']
 
-# class CartSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Cart
-#         fields = ['cart_id', 'user', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Cart
 
-# class CartItemSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CartItem
-#         fields = ['cart_item_id', 'cart', 'product', 'quantity', 'added_at']  # Cập nhật các trường cho phù hợp với model CartItem
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['order_id', 'user', 'status', 'total', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Order
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='product.name')
-    price = serializers.DecimalField(source='product.price', max_digits=10, decimal_places=2)
+    order = serializers.PrimaryKeyRelatedField(queryset=Order.objects.all())  # Assuming you link to an Order
+    product_name = serializers.CharField(source='product.name')  # To show the product name directly
+    product_price = serializers.DecimalField(source='product.price', max_digits=10, decimal_places=2)  # Product price
 
     class Meta:
         model = OrderItem
-        fields = ['product_name', 'quantity', 'price']
+        fields = ['order_item_id', 'order', 'product_name', 'product_price', 'quantity', 'price']
+        read_only_fields = ['order_item_id']
+
 
 class ShippingAddressSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ShippingAddress
-        fields = ['recipient_name', 'recipient_phone', 'recipient_address']
-
-class OrderSerializer(serializers.ModelSerializer):
-    order_items = OrderItemSerializer(many=True, read_only=True)
-    shipping_address = ShippingAddressSerializer(read_only=True)
+    user = serializers.StringRelatedField()  # Assuming 'user' is a foreign key to the User model
+    items = CartItemSerializer(source='cartitem_set', many=True)  # Nested CartItemSerializer for each Cart item
 
     class Meta:
-        model = Order
-        fields = ['order_id', 'total', 'status', 'order_items', 'shipping_address']
+        model = Cart
+        fields = ['cart_id', 'user', 'created_at', 'updated_at']  # Cập nhật các trường cho phù hợp với model Cart
+
+class CartItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CartItem
+        fields = ['cart_item_id', 'cart', 'product', 'quantity', 'added_at']  # Cập nhật các trường cho phù hợp với model CartItem

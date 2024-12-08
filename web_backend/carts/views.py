@@ -1,5 +1,4 @@
-from django.shortcuts import render
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Cart, CartItem, Product
@@ -13,7 +12,7 @@ def get_cart(request, user_id):
     try:
         cart = Cart.objects.get(user__user_id=user_id)
         serializer = CartSerializer(cart)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     except Cart.DoesNotExist:
         return Response({"error": "Giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -68,8 +67,11 @@ def update_cart_item(request, user_id):
         if quantity <= 0:
             return Response({"error": "Số lượng phải lớn hơn 0"}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            # Kiểm tra và lấy sản phẩm trong giỏ hàng
+        with transaction.atomic():  
+            if not cart_item_id or not quantity:
+                return Response({"error": "cart_item_id và quantity là bắt buộc"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Kiểm tra và lấy sản phẩm trong giỏ hàng
             cart_item = CartItem.objects.select_related('product').get(cart__user__user_id=user_id, cart_item_id=cart_item_id)
             product = cart_item.product
 
@@ -87,6 +89,7 @@ def update_cart_item(request, user_id):
             # Cập nhật số lượng trong giỏ hàng
             cart_item.quantity = quantity
             cart_item.save()
+
 
         return Response({"message": "Số lượng sản phẩm đã được cập nhật"}, status=status.HTTP_200_OK)
 
@@ -113,30 +116,21 @@ def remove_from_cart(request, user_id, cart_item_id):
             # Xóa sản phẩm khỏi giỏ hàng
             cart_item.delete()
 
+
         return Response({"message": "Sản phẩm đã được xóa khỏi giỏ hàng"}, status=status.HTTP_200_OK)
     except CartItem.DoesNotExist:
-        return Response({"error": "Sản phẩm không có trong giỏ hàng"}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": f"Đã xảy ra lỗi: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({"error": "Sản phẩm không tồn tại trong giỏ hàng"}, status=status.HTTP_404_NOT_FOUND)
+    
 # Xóa tất cả sản phẩm trong giỏ hàng
 @api_view(['DELETE'])
 def clear_cart(request, user_id):
     try:
-        with transaction.atomic():
-            cart = Cart.objects.get(user__user_id=user_id)
-            cart_items = cart.cartitem_set.select_related('product')
-
-            # Hoàn lại số lượng sản phẩm vào kho
-            for item in cart_items:
-                product = item.product
-                product.quantity += item.quantity
-                product.save()
-
-            cart_items.delete()
-
+        # Lấy giỏ hàng của người dùng và xóa tất cả sản phẩm
+        cart = Cart.objects.get(user__user_id=user_id)
+        cart.cartitem_set.all().delete()
         return Response({"message": "Giỏ hàng đã được xóa"}, status=status.HTTP_204_NO_CONTENT)
     except Cart.DoesNotExist:
         return Response({"error": "Giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": f"Đã xảy ra lỗi: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
