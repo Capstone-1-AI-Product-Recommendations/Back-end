@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
+from web_backend.models import Shop, Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
 from users.serializers import UserSerializer
 from cloudinary.uploader import upload as cloudinary_upload
 from cloudinary.uploader import upload
@@ -56,22 +56,22 @@ class ProductVideoSerializer(serializers.ModelSerializer):
         fields = ['file', 'product']
 
 
-# Serializer for CRUD Product operations
-class CRUDProductSerializer(serializers.ModelSerializer):
-    seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=True)
-    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=True)
-    subcategory = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=False)
+# # Serializer for CRUD Product operations
+# class CRUDProductSerializer(serializers.ModelSerializer):
+#     seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=True)
+#     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=True)
+#     subcategory = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=False)
 
-    images = serializers.ListField(
-        child=serializers.ImageField(), write_only=True, required=False
-    )
-    videos = serializers.ListField(
-        child=serializers.FileField(), write_only=True, required=False
-    )
+#     images = serializers.ListField(
+#         child=serializers.ImageField(), write_only=True, required=False
+#     )
+#     videos = serializers.ListField(
+#         child=serializers.FileField(), write_only=True, required=False
+#     )
 
-    class Meta:
-        model = Product
-        fields = ['name', 'price', 'category', 'subcategory', 'description', 'seller', 'quantity', 'color', 'brand', 'stock_status', 'images', 'videos']
+#     class Meta:
+#         model = Product
+#         fields = ['name', 'price', 'category', 'subcategory', 'description', 'seller', 'quantity', 'color', 'brand', 'stock_status', 'images', 'videos']
 
 # Serializer cho Comment
 class CommentSerializer(serializers.ModelSerializer):
@@ -157,32 +157,43 @@ class ProductSerializer(serializers.ModelSerializer):
             'color', 'brand', 'stock_status'
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
-    seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=True)
+    category = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=False)
+    seller = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    
     images = serializers.ListField(
         child=serializers.ImageField(), write_only=True, required=False
     )
     videos = serializers.ListField(
         child=serializers.FileField(), write_only=True, required=False
     )
-
+    
     class Meta:
         model = Product
-        fields = ['name', 'price', 'category', 'description', 'seller', 'quantity', 'images', 'videos']
+        fields = ['name', 'price', 'category', 'subcategory', 'description', 'seller', 'quantity', 'color', 'brand', 'images', 'videos']
+        
 
-    def validate(self, attrs):
-        seller = attrs.get('seller')
-        if seller.role.role_name != "Seller":
-            raise serializers.ValidationError("Only sellers can create products.")
-        return attrs
+    # def validate(self, attrs):
+    #     seller = attrs.get('seller')
+    #     if seller.role.role_name != "Seller":
+    #         raise serializers.ValidationError("Only sellers can create products.")
+    #     return attrs
     
     def create(self, validated_data):
+        category = validated_data.pop('category', None)
+        seller = validated_data.pop('seller', None)
         # Lấy dữ liệu ảnh và video từ validated_data
         images_data = validated_data.pop('images', [])
         videos_data = validated_data.pop('videos', [])
 
         # Tạo sản phẩm mới
         product = Product.objects.create(**validated_data)
+        if category:
+            product.subcategory = category
+            product.save()
 
+        if seller:
+            product.User = seller
+            product.save()
         # Xử lý ảnh
         if images_data:
             for image_data in images_data:
@@ -193,7 +204,7 @@ class CRUDProductSerializer(serializers.ModelSerializer):
                 # Lưu URL ảnh vào bảng ProductImage
                 ProductImage.objects.create(product=product, file=image_url)
 
-        # Xử lý video
+        # Nén và lưu video vào Cloudinary
         if videos_data:
             for video_data in videos_data:
                 # Tải video lên Cloudinary
@@ -204,4 +215,3 @@ class CRUDProductSerializer(serializers.ModelSerializer):
                 ProductVideo.objects.create(product=product, file=video_url)
 
         return product
-

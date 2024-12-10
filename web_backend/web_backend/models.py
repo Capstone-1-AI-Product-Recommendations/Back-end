@@ -195,7 +195,7 @@ class ProductAd(models.Model):
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE,related_name='images')
 
     class Meta:
         managed = False
@@ -219,7 +219,7 @@ class ProductRecommendation(models.Model):
 class ProductVideo(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE,related_name='videos')
 
     class Meta:
         managed = False

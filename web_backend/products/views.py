@@ -20,48 +20,57 @@ from recommendations.views import get_recommended_products
 @api_view(['GET'])
 def product_detail(request, user_id, product_id):
     try:
-        product = Product.objects.select_related('category', 'seller') \
-                                  .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set') \
-                                  .get(product_id=product_id)        
+        # Sử dụng select_related cho 'subcategory' và 'shop__user', và prefetch_related cho ảnh và video
+        product = Product.objects.select_related('subcategory', 'shop__user') \
+                                  .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set', 'images', 'videos') \
+                                  .get(product_id=product_id)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+    
     serializer = DetailProductSerializer(product)
     return Response(serializer.data)
 
 # API to create a new product
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
-def create_product(request, seller_id, shop_info_id):
+def create_product(request, seller_id, shop_id):
     try:
-        # Kiểm tra seller_id hợp lệ và là người bán
+        # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
         seller = User.objects.get(user_id=seller_id)
         if not seller.role or seller.role.role_name != "Seller":
             return Response({"detail": "Only sellers can create products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra shopinfo_id hợp lệ và lấy ShopInfo
+    
+    # Kiểm tra shop_id hợp lệ và lấy Shop
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Sao chép dữ liệu request.data thành một dict có thể sửa đổi
-    request.data['seller'] = seller_id  # Truyền seller_id vào request data
-    # Khởi tạo serializer để tạo sản phẩm
-    serializer = CRUDProductSerializer(data=request.data)
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Thêm seller_id vào request.data
+    request.data['seller'] = seller_id
+    
+    # Khởi tạo serializer với dữ liệu và context seller
+    serializer = CRUDProductSerializer(data=request.data, context={'seller': seller})
+
     if serializer.is_valid():
-        # Lưu sản phẩm và gán seller
-        product = serializer.save(seller=seller)
-        # Cập nhật số lượng sản phẩm trong ShopInfo
+        # Lưu sản phẩm, điều này sẽ tạo ra các hình ảnh và video liên quan
+        # product = serializer.save()
+        product = serializer.save(shop=shop)
+        # Cập nhật số lượng sản phẩm trong Shop
+        shop_info, created = ShopInfo.objects.get_or_create(shop=shop)
         shop_info.product_count += 1
         shop_info.save()
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # API to update a product by product ID
 @api_view(['PUT'])
 @parser_classes([MultiPartParser, FormParser])
-def update_product(request, seller_id, shop_info_id, product_id):
+def update_product(request, seller_id, shop_id, product_id):
     # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
         seller = User.objects.get(user_id=seller_id)
@@ -69,96 +78,87 @@ def update_product(request, seller_id, shop_info_id, product_id):
             return Response({"detail": "Only sellers can update products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+
+    # Kiểm tra shop_id hợp lệ và lấy Shop
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Truy xuất sản phẩm cần cập nhật thông qua mối quan hệ với User (seller)
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy sản phẩm cần cập nhật theo product_id và shop
     try:
-        # Kiểm tra sản phẩm có thuộc về seller hay không
-        product = Product.objects.get(product_id=product_id, seller=seller)
-        
-        # Kiểm tra sản phẩm có thuộc về shop tương ứng hay không
-        if product.seller == seller:  # Kiểm tra seller của sản phẩm
-            
-            # Cập nhật thông tin sản phẩm
-            product_name = request.data.get('name', product.name)
-            product_price = request.data.get('price', product.price)
-            product_quantity = request.data.get('quantity', product.quantity)
-            product_description = request.data.get('description', product.description)
-            
-            # Cập nhật thông tin sản phẩm
-            product.name = product_name
-            product.price = product_price
-            product.quantity = product_quantity
-            product.description = product_description
-
-            # Xử lý ảnh (nếu có ảnh mới)
-            images_data = request.FILES.getlist('images', [])
-            if images_data:
-                # Xóa các ảnh cũ
-                product.images.all().delete()
-                for image_data in images_data:
-                    image_url = compress_and_upload_image(image_data)
-                    ProductImage.objects.create(product=product, file=image_url)
-
-            # Xử lý video (nếu có video mới)
-            videos_data = request.FILES.getlist('videos', [])
-            if videos_data:
-                # Xóa các video cũ
-                product.videos.all().delete()
-                for video_data in videos_data:
-                    video_url = compress_and_upload_video(video_data)
-                    ProductVideo.objects.create(product=product, file=video_url)
-
-            # Lưu các thay đổi
-            product.save()
-
-            return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
-        else:
-            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
+        product = Product.objects.get(product_id=product_id, shop=shop)
     except Product.DoesNotExist:
-        return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"detail": "Product not found in the specified shop."}, status=status.HTTP_404_NOT_FOUND)
 
+    # Cập nhật thông tin sản phẩm
+    product_name = request.data.get('name', product.name)
+    product_price = request.data.get('price', product.price)
+    product_quantity = request.data.get('quantity', product.quantity)
+    product_description = request.data.get('description', product.description)
 
-    serializer = CRUDProductSerializer(product, data=request.data, partial=True)
-    if serializer.is_valid():
-        updated_product = serializer.save()
-        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Cập nhật các trường của sản phẩm
+    product.name = product_name
+    product.price = product_price
+    product.quantity = product_quantity
+    product.description = product_description
+
+    # Xử lý ảnh (nếu có ảnh mới)
+    images_data = request.FILES.getlist('images', [])
+    if images_data:
+        # Xóa các ảnh cũ nếu có
+        product.images.all().delete()
+        for image_data in images_data:
+            image_url = compress_and_upload_image(image_data)  # Hàm xử lý ảnh
+            ProductImage.objects.create(product=product, file=image_url)
+
+    # Xử lý video (nếu có video mới)
+    videos_data = request.FILES.getlist('videos', [])
+    if videos_data:
+        # Xóa các video cũ nếu có
+        product.videos.all().delete()
+        for video_data in videos_data:
+            video_url = compress_and_upload_video(video_data)  # Hàm xử lý video
+            ProductVideo.objects.create(product=product, file=video_url)
+
+    # Lưu các thay đổi
+    product.save()
+
+    return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
 
 @api_view(['DELETE'])
-def delete_product(request, seller_id, shop_info_id, product_id):
+def delete_product(request, seller_id, shop_id, product_id):
     # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
         seller = User.objects.get(user_id=seller_id)
         if not seller.role or seller.role.role_name != "Seller":
             return Response({"detail": "Only sellers can delete products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
-        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
-    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Kiểm tra shop_id hợp lệ và shop thuộc sở hữu của seller
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra sản phẩm có thuộc về seller và shop hay không
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Kiểm tra sản phẩm có thuộc về shop hay không
     try:
-        product = Product.objects.get(product_id=product_id, seller=seller)
-        if product.seller == seller:
-            # Giảm số lượng sản phẩm trong ShopInfo
+        product = Product.objects.get(product_id=product_id, shop=shop)
+        # Giảm số lượng sản phẩm trong ShopInfo (nếu có liên kết với ShopInfo)
+        try:
+            shop_info = ShopInfo.objects.get(shop=shop)
             if shop_info.product_count > 0:
                 shop_info.product_count -= 1
                 shop_info.save()
-            # Xóa sản phẩm
-            product.delete()
-            return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
+        except ShopInfo.DoesNotExist:
+            pass  # Nếu không có ShopInfo liên kết, bỏ qua
+        # Xóa sản phẩm
+        product.delete()
+        return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
 
 
 # API to get the featured products (Top 6 products marked as featured)
