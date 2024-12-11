@@ -32,14 +32,14 @@ SITE_ID = 1
 
 INSTALLED_APPS = [
     # Django default apps
-    # 'django.contrib.sites',
+    'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-      # `sites` app cần trước các app liên quan đến allauth
+    # `sites` app cần trước các app liên quan đến allauth
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
@@ -60,13 +60,13 @@ INSTALLED_APPS = [
     'orders',
     'payments',
     'recommendations',
-    'seller_dashboard',     
-    'web_backend',
+    # 'seller_dashboard',     ?
+    'web_backend.apps.WebBackendConfig',
 ]
 
 MIGRATION_MODULES = {
-    'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
-    'sessions': None,  # Ngừng tạo bảng cho 'sessions'
+    # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
+    # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
     'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
     'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
@@ -115,7 +115,7 @@ TEMPLATES = [
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 3600
-
+SESSION_SAVE_EVERY_REQUEST = True
 WSGI_APPLICATION = "web_backend.wsgi.application"
 
 GOOGLE_CLIENT_ID = '591294797278-10rip37g7755at0eg17r5nj1rbk61m4a.apps.googleusercontent.com'
@@ -159,9 +159,9 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone_1',
+        'NAME': 'capstone1',
         'USER': 'root',
-        'PASSWORD': '12345',
+        'PASSWORD': 'nhc171103',
         'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
@@ -170,6 +170,7 @@ DATABASES = {
         },
     }
 }
+
 
 
 # Password validation
@@ -265,4 +266,11 @@ EMAIL_HOST_USER = 'aiproductrecommendation@gmail.com'  # Email của bạn
 EMAIL_HOST_PASSWORD = 'fhow btav zjjr gthc'  # Mật khẩu email
 DEFAULT_FROM_EMAIL = 'E-commerce <aiproductrecommendation@gmail.com>'
 
+PAYOS_CLIENT_ID = '8beadbae-a0e7-4923-b5e9-f49fcadd3ca4'
+PAYOS_API_KEY = '760cfb21-3d78-428e-b556-3a41060d8a42'
+PAYOS_CHECKSUM_KEY = '43588c53ec34ac56749988368dbdac4c7fed5f512aafc1941c61da712ecef7a9'
+PAYOS_API_URL = 'https://payosapi.com/transaction'  
+
+
 JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'
+

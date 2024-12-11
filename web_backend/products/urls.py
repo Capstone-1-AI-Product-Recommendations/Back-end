@@ -12,10 +12,10 @@ from . import views
 
 urlpatterns = [
     # Product-related URLs
-    path('products/detail/<int:product_id>/', product_detail, name='product_detail'),
-    path('products/create/', create_product, name='create_product'),
-    path('products/update/<int:product_id>/', update_product, name='update_product'),
-    path('products/delete/<int:product_id>/', delete_product, name='delete_product'),
+    # path('products/detail/<int:product_id>/', product_detail, name='product_detail'),
+    # path('products/create/', create_product, name='create_product'),
+    # path('products/update/<int:product_id>/', update_product, name='update_product'),
+    # path('products/delete/<int:product_id>/', delete_product, name='delete_product'),
 
     # Product display APIs
     path('featured/', get_featured_products, name='featured_products'),
@@ -29,9 +29,9 @@ urlpatterns = [
     # Comments API
     path('latest-comments/', get_latest_comments, name='latest_comments'),
     path('products/detail/<int:user_id>/<int:product_id>/', product_detail, name='product_detail'),
-    path('seller/<int:seller_id>/shops/<int:shop_info_id>/create_product/', create_product, name='create_product'),
-    path('seller/<seller_id>/shops/<shop_info_id>/update_product/<product_id>/', update_product, name='update_product'),
-    path('seller/<seller_id>/shops/<shop_info_id>/delete_product/<product_id>/', delete_product, name='delete_product'),
+    path('seller/<int:seller_id>/shops/<int:shop_id>/create_product/', create_product, name='create_product'),
+    path('seller/<seller_id>/shops/<shop_id>/update_product/<product_id>/', update_product, name='update_product'),
+    path('seller/<seller_id>/shops/<shop_id>/delete_product/<product_id>/', delete_product, name='delete_product'),
     path('featured/', views.get_featured_products, name='featured_products'),
     path('trending/', views.get_trending_products, name='trending_products'),
     path('random/', views.get_random_products, name='random_products'),

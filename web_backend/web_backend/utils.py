@@ -3,6 +3,7 @@ import cloudinary.uploader
 import os
 from PIL import Image
 import tempfile
+import requests
 
 cloudinary.config(
     cloud_name='dkleeailh',  # Thay bằng cloud_name của bạn
@@ -39,3 +40,42 @@ def compress_and_upload_video(video_file):
         chunk_size=10 * 1024 * 1024  # Đảm bảo từng chunk nhỏ hơn 10MB
     )
     return response.get('secure_url')
+
+
+def transfer_funds(bank_name, account_number, account_holder_name, amount, description):
+    
+    # Args:
+    #     bank_name (str): Tên ngân hàng của seller.
+    #     account_number (str): Số tài khoản ngân hàng của seller.
+    #     account_holder_name (str): Tên chủ tài khoản của seller.
+    #     amount (float): Số tiền cần chuyển.
+    #     description (str): Mô tả giao dịch (ví dụ: "Payment for order 123").
+    
+    # Returns:
+    #     Response: Phản hồi từ API của PayOS hoặc lỗi nếu có.
+    
+    # URL của PayOS (hoặc hệ thống chuyển tiền bạn đang sử dụng)
+    payos_url = "https://api.payos.com/transfer"  # Đây chỉ là ví dụ, thay thế bằng URL thật
+
+    # Thông tin cần truyền vào API của PayOS
+    payload = {
+        "bank_name": bank_name,
+        "account_number": account_number,
+        "account_holder_name": account_holder_name,
+        "amount": amount,
+        "description": description,
+    }
+
+    # Thực hiện gọi API để chuyển tiền
+    try:
+        response = requests.post(payos_url, json=payload)
+
+        # Kiểm tra nếu trả về mã thành công (200 OK)
+        if response.status_code == 200:
+            return response  # Thành công
+        else:
+            return response  # Trả lại phản hồi từ PayOS nếu thất bại
+
+    except requests.exceptions.RequestException as e:
+        # Xử lý lỗi khi không thể kết nối với API
+        return {"error": str(e)}

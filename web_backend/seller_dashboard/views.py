@@ -1,11 +1,9 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from web_backend.models import Product, Order, OrderItem, Ad, ProductAd, SellerProfile, Notification, Comment, ProductRecommendation
-from .serializers import ProductSerializer, AdSerializer, ProductAdSerializer, SellerProfileSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
 from orders.serializers import OrderSerializer, OrderItemSerializer
 from web_backend.models import ShopInfo, Shop, User, Product, Order, OrderItem, Ad, ProductAd, Notification, Comment, ProductRecommendation
-from .serializers import ShopInfoSerializer, ShopSerializer, ProductSerializer, OrderSerializer, OrderItemSerializer, AdSerializer, ProductAdSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
+from .serializers import ShopInfoSerializer, ShopSerializer, ProductSerializer, SellOrderSerializer, SellOrderItemSerializer, AdSerializer, ProductAdSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
 # seller_dashboard/views.py
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -27,8 +25,8 @@ def get_orders(request, seller_id):
             return Response({"detail": "Only sellers can view orders."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    orders = Order.objects.filter(orderitem__product__seller_id=seller_id).distinct()
-    serializer = OrderSerializer(orders, many=True)
+    orders = Order.objects.filter(orderitem__product__shop__user=seller).distinct()
+    serializer = SellOrderSerializer(orders, many=True)
     return Response(serializer.data)
 
 
@@ -41,15 +39,20 @@ def get_order_details(request, seller_id, order_id):
             return Response({"detail": "Only sellers can view order details."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
     # Lấy thông tin đơn hàng theo order_id và seller_id
-    order = get_object_or_404(Order, order_id=order_id, orderitem__product__seller_id=seller_id)
+    # Sửa lại để truy vấn qua OrderItem và Product
+    order = get_object_or_404(Order, order_id=order_id, orderitem__product__shop__user=seller)
+
     order_items = OrderItem.objects.filter(order=order)
-    order_item_serializer = OrderItemSerializer(order_items, many=True)
-    order_serializer = OrderSerializer(order)    
+    order_item_serializer = SellOrderItemSerializer(order_items, many=True)
+    order_serializer = SellOrderSerializer(order)
+
     return Response({
         'order': order_serializer.data,
         'items': order_item_serializer.data
     })
+
 
 
 @api_view(['GET', 'PUT'])
@@ -61,11 +64,17 @@ def update_order_status(request, order_item_id, seller_id):
             return Response({"detail": "Only sellers can update order status."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
+    
     try:
         # Lấy OrderItem theo order_item_id
         order_item = OrderItem.objects.get(order_item_id=order_item_id)
         # Lấy Order từ OrderItem
         order = order_item.order
+
+        # Kiểm tra xem người bán có phải là chủ của sản phẩm trong OrderItem hay không
+        if order_item.product.shop.user.user_id != seller_id:
+            return Response({"error": "Bạn không phải là người bán của sản phẩm trong đơn hàng này."}, status=status.HTTP_403_FORBIDDEN)
+
         if request.method == 'GET':
             # Trả về thông tin đơn hàng và trạng thái
             return Response({
@@ -77,10 +86,8 @@ def update_order_status(request, order_item_id, seller_id):
                 "quantity": order_item.quantity,
                 "product_price": order_item.price,
             }, status=status.HTTP_200_OK)
+        
         elif request.method == 'PUT':
-            # Kiểm tra xem seller_id có phải là người bán của sản phẩm trong OrderItem không
-            if order_item.product.seller.user_id != seller_id:
-                return Response({"error": "Bạn không phải là người bán của sản phẩm trong đơn hàng này."}, status=status.HTTP_403_FORBIDDEN)
             # Kiểm tra trạng thái hiện tại của đơn hàng
             if order.status == 'Confirmed':
                 return Response({"error": "Đơn hàng đã được xác nhận."}, status=status.HTTP_400_BAD_REQUEST)
@@ -90,20 +97,28 @@ def update_order_status(request, order_item_id, seller_id):
             order.status = 'Confirmed'
             order.save()
             return Response({"message": "Trạng thái đơn hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
+    
     except OrderItem.DoesNotExist:
         return Response({"error": "Sản phẩm trong đơn hàng không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
     except Order.DoesNotExist:
         return Response({"error": "Đơn hàng không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
 
+
 @api_view(['POST'])
 def create_shop(request, seller_id):
     # Thêm seller vào validated_data trước khi tạo sản phẩm
-    request.data['seller'] = seller_id  # Truyền seller_id vào request data
-    # Kiểm tra dữ liệu shop
-    serializer = ShopSerializer(data=request.data)
+    mutable_data = request.data.copy()
+    mutable_data['seller'] = seller_id  # Thêm seller vào dữ liệu
+
+    # Sử dụng serializer với dữ liệu mới
+    serializer = ShopSerializer(data=mutable_data)
 
     if serializer.is_valid():
         shop_name = serializer.validated_data.get('shop_name')
+        try:
+            seller = User.objects.get(pk=seller_id)
+        except User.DoesNotExist:
+            return Response({"error": "Seller not found"}, status=status.HTTP_404_NOT_FOUND)
         # Tạo shop mới
         shop = Shop.objects.create(shop_name=shop_name, user=seller)
         # Tạo thông tin shop vào ShopInfo
@@ -214,8 +229,16 @@ def get_comments(request, seller_id):
             return Response({"detail": "Only sellers can view comments."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    comments = Comment.objects.filter(product__seller_id=seller_id)
+
+    # Lấy các sản phẩm của cửa hàng mà người bán này sở hữu
+    products = Product.objects.filter(shop__user=seller)
+    
+    # Lọc các bình luận của các sản phẩm này
+    comments = Comment.objects.filter(product__in=products)
+    
+    # Serialize dữ liệu
     serializer = CommentSerializer(comments, many=True)
+    
     return Response(serializer.data)
 
 
@@ -229,12 +252,17 @@ def get_comments_for_product(request, seller_id, product_id):
             return Response({"detail": "Only sellers can view comments for their products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lọc các bình luận cho sản phẩm thuộc cửa hàng của seller
     comments = Comment.objects.filter(
-        product__seller_id=seller_id,
-        product_id=product_id
+        product__shop__user=seller,  # Lọc sản phẩm của cửa hàng của seller
+        product_id=product_id  # Lọc theo product_id
     )
+    
+    # Serialize dữ liệu
     serializer = CommentSerializer(comments, many=True)
     return Response(serializer.data)
+
 
 
 # Báo cáo và thống kê
@@ -247,9 +275,16 @@ def sales_report(request, seller_id):
             return Response({"detail": "Only sellers can view sales report."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    orders = Order.objects.filter(orderitem__product__seller_id=seller_id).distinct()
-    serializer = OrderSerializer(orders, many=True)
+
+    # Lọc các đơn hàng có sản phẩm thuộc cửa hàng của seller
+    orders = Order.objects.filter(
+        orderitem__product__shop__user=seller  # Lọc sản phẩm của cửa hàng thuộc seller
+    ).distinct()
+
+    # Serialize dữ liệu
+    serializer = SellOrderSerializer(orders, many=True)
     return Response(serializer.data)
+
 
 
 @api_view(['GET'])
@@ -261,7 +296,11 @@ def ad_performance(request, seller_id):
             return Response({"detail": "Only sellers can view ad performance."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    product_ads = ProductAd.objects.filter(product__seller_id=seller_id)
+
+    # Truy vấn các quảng cáo cho sản phẩm của seller thông qua Shop
+    product_ads = ProductAd.objects.filter(product__shop__user=seller)
+
+    # Serialize dữ liệu
     serializer = ProductAdSerializer(product_ads, many=True)
     return Response(serializer.data)
 
@@ -276,11 +315,25 @@ def sales_report_for_product(request, seller_id, product_id):
             return Response({"detail": "Only sellers can view sales report for products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Truy vấn shop của seller_id
+    try:
+        shop = Shop.objects.get(user_id=seller_id)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop for the seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Truy vấn sản phẩm thuộc shop này
+    try:
+        product = Product.objects.get(product_id=product_id, shop=shop)  # Liên kết với shop
+    except Product.DoesNotExist:
+        return Response({"detail": "Product not found for this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lọc đơn hàng liên quan đến sản phẩm của shop này
     orders = Order.objects.filter(
-        orderitem__product__seller_id=seller_id,
-        orderitem__product_id=product_id
+        orderitem__product=product  # Lọc theo sản phẩm
     ).distinct()
-    serializer = OrderSerializer(orders, many=True)
+
+    serializer = SellOrderSerializer(orders, many=True)
     return Response(serializer.data)
 
 
@@ -294,12 +347,16 @@ def ad_performance_for_product(request, seller_id, product_id):
             return Response({"detail": "Only sellers can view ad performance for products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Truy vấn quảng cáo của sản phẩm trong shop của seller
     product_ads = ProductAd.objects.filter(
-        product__seller_id=seller_id,
+        product__shop__user_id=seller_id,  # Liên kết qua shop và user
         product_id=product_id
     )
+
     serializer = ProductAdSerializer(product_ads, many=True)
     return Response(serializer.data)
+
 
 
 # Quản lý khuyến nghị sản phẩm
@@ -312,20 +369,24 @@ def get_product_recommendations(request, seller_id):
             return Response({"detail": "Only sellers can view product recommendations."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    recommendations = ProductRecommendation.objects.filter(product__seller_id=seller_id)
+
+    # Sửa lại truy vấn để liên kết qua shop và user
+    recommendations = ProductRecommendation.objects.filter(product__shop__user_id=seller_id)
     serializer = ProductRecommendationSerializer(recommendations, many=True)
     return Response(serializer.data)
+
 
 
 # Khuyến nghị cho một sản phẩm
 @api_view(['GET'])
 def get_product_recommendations_for_product(request, seller_id, product_id):
     recommendations = ProductRecommendation.objects.filter(
-        product__seller_id=seller_id,
+        product__shop__user_id=seller_id,  # Liên kết qua shop và user
         product_id=product_id
     )
     serializer = ProductRecommendationSerializer(recommendations, many=True)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @seller_required
