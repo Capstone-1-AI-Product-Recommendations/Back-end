@@ -18,6 +18,8 @@ from django.db.models import Count
 import random
 from django.db.models import Q
 from django.urls import reverse
+from django.db.models import Sum, Avg, F
+
 
 # Import get_recommended_products correctly
 from recommendations.views import get_recommended_products
@@ -182,12 +184,15 @@ def get_random_products(request):
     serialized_data = ProductSerializer(random_products, many=True).data
     return Response(serialized_data)
 
-# API to get popular categories (Top 3 categories with most products)
+# API to get popular categories (Top 3 categories with most subcategories)
 @api_view(['GET'])
 def get_popular_categories(request):
+    # Annotate categories with the count of their subcategories
     popular_categories = Category.objects.annotate(
-        product_count=Count('product')
-    ).order_by('-product_count')[:3]
+        subcategory_count=Count('subcategory')  # 'subcategory' là related_name của ForeignKey trong model Subcategory
+    ).order_by('-subcategory_count')[:3]  # Get top 3 categories
+
+    # Serialize the data
     serialized_data = CategorySerializer(popular_categories, many=True).data
     return Response(serialized_data)
 
@@ -241,7 +246,7 @@ def homepage_api(request):
 def filter_by_category(request):
     category = request.GET.get('category')
     if category:
-        products = Product.objects.filter(category__category_name__iexact=category)
+        products = Product.objects.filter(subcategory__category__category_name__iexact=category)
         serialized_data = ProductSerializer(products, many=True).data
         return Response(serialized_data, status=200)
     return Response({"message": "Category parameter is required"}, status=400)
@@ -309,19 +314,22 @@ def filter_by_stock_status(request):
 @api_view(['GET'])
 def filter_page(request):
     products = Product.objects.all()
+    print(f"Initial count: {products.count()}")  # Debug log
 
     # Tìm kiếm theo từ khóa
-    search_term = request.GET.get('search_term')
+    search_term = request.GET.get('search_term', '').strip()
     if search_term:
         products = products.filter(
             Q(name__icontains=search_term) |
             Q(description__icontains=search_term)
         )
+        print(f"After search: {products.count()}")  # Debug log
 
     # Bộ lọc theo category
-    category = request.GET.get('category')
+    category = request.GET.get('category', '').strip()
     if category:
-        products = products.filter(category__category_name__iexact=category)
+        products = products.filter(subcategory__category__category_name__iexact=category)
+        print(f"After category: {products.count()}")  # Debug log
 
     # Bộ lọc theo price
     min_price = request.GET.get('min_price')
@@ -331,45 +339,55 @@ def filter_page(request):
             min_price = float(min_price)
             max_price = float(max_price)
             products = products.filter(price__gte=min_price, price__lte=max_price)
+            print(f"After price: {products.count()}")  # Debug log
         except ValueError:
-            return Response({"message": "Price parameters must be numeric"}, status=400)
+            pass
 
     # Bộ lọc theo color
-    color = request.GET.get('color')
+    color = request.GET.get('color', '').strip()
     if color:
         products = products.filter(color__iexact=color)
+        print(f"After color: {products.count()}")  # Debug log
 
     # Bộ lọc theo brand
-    brand = request.GET.get('brand')
+    brand = request.GET.get('brand', '').strip()
     if brand:
         products = products.filter(brand__iexact=brand)
+        print(f"After brand: {products.count()}")  # Debug log
 
     # Bộ lọc theo stock status
-    stock_status = request.GET.get('stock_status')
+    stock_status = request.GET.get('stock_status', '').strip()
     if stock_status:
         if stock_status == 'in_stock':
             products = products.filter(quantity__gt=0)
         elif stock_status == 'out_of_stock':
             products = products.filter(quantity=0)
+        print(f"After stock: {products.count()}")  # Debug log
 
     # Bộ lọc theo city và province
-    city = request.GET.get('city')
-    province = request.GET.get('province')
+    city = request.GET.get('city', '').strip()
+    province = request.GET.get('province', '').strip()
     if city:
-        products = products.filter(seller__user__sellerprofile__city__icontains=city)
+        products = products.filter(shop__user__city__icontains=city)
+        print(f"After city: {products.count()}")  # Debug log
     if province:
-        products = products.filter(seller__sellerprofile__province__icontains=province)
+        products = products.filter(shop__user__province__icontains=province)
+        print(f"After province: {products.count()}")  # Debug log
 
     # Serialize sản phẩm
     products_serialized = ProductSerializer(products, many=True).data
 
-    # Lọc người bán liên quan đến các sản phẩm đã lọc
-    related_sellers_ids = products.values_list('seller_id', flat=True).distinct()
-    sellers = SellerProfile.objects.filter(seller_id__in=related_sellers_ids)[:2]
+    # Lọc shop liên quan
+    related_shop_ids = products.values_list('shop_id', flat=True).distinct()
+    sellers = User.objects.filter(
+        shop__shop_id__in=related_shop_ids,
+        role__role_name='Seller'
+    )[:2]
     sellers_serialized = UserSerializer(sellers, many=True).data
 
     return Response({
         "products": products_serialized,
-        "top_sellers": sellers_serialized
+        "top_sellers": sellers_serialized,
+        "total_count": len(products_serialized)  # Thêm số lượng sản phẩm vào response
     }, status=200)
 

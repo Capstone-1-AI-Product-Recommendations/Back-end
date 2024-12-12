@@ -6,6 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from django.db.models import Avg
 
 
 class Ad(models.Model):
@@ -37,7 +38,7 @@ class CartItem(models.Model):
     cart_item_id = models.AutoField(primary_key=True)
     quantity = models.IntegerField(blank=True, null=True)
     added_at = models.DateTimeField(blank=True, null=True)
-    cart = models.ForeignKey(Cart, models.DO_NOTHING)
+    cart = models.ForeignKey('Cart', models.DO_NOTHING)
     product = models.ForeignKey('Product', models.DO_NOTHING)
 
     class Meta:
@@ -53,6 +54,16 @@ class Category(models.Model):
     class Meta:
         managed = False
         db_table = 'category'
+
+class Subcategory(models.Model):
+    subcategory_id = models.AutoField(primary_key=True)
+    category = models.ForeignKey('Category', on_delete=models.CASCADE, blank=True, null=True)
+    subcategory_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'subcategory'
 
 
 class Comment(models.Model):
@@ -108,7 +119,7 @@ class OrderItem(models.Model):
     order_item_id = models.AutoField(primary_key=True)
     quantity = models.IntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    order = models.ForeignKey(Order, models.DO_NOTHING)
+    order = models.ForeignKey('Order', models.DO_NOTHING)
     product = models.ForeignKey('Product', models.DO_NOTHING)
 
     class Meta:
@@ -124,7 +135,7 @@ class Payment(models.Model):
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
-    order = models.ForeignKey(Order, models.DO_NOTHING)
+    order = models.ForeignKey('Order', models.DO_NOTHING)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
@@ -139,6 +150,7 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField()
+<<<<<<< Updated upstream
     subcategory = models.ForeignKey('Subcategory', models.DO_NOTHING, blank=True, null=True)
     is_featured = models.BooleanField(default=False)  # Sửa thành BooleanField
     color = models.CharField(max_length=100, blank=True, null=True)
@@ -147,6 +159,17 @@ class Product(models.Model):
     shop = models.ForeignKey('Shop', models.DO_NOTHING, blank=True, null=True)
     promotion_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Thêm trường này
     event_id = models.IntegerField(blank=True, null=True)  # Thêm trường này
+=======
+    subcategory = models.ForeignKey('Subcategory', on_delete=models.SET_NULL, blank=True, null=True)
+    is_featured = models.BooleanField(default=False)
+    color = models.CharField(max_length=100, blank=True, null=True)
+    brand = models.CharField(max_length=100, blank=True, null=True)
+    detail_product = models.TextField(blank=True, null=True)
+    shop = models.ForeignKey('Shop', on_delete=models.SET_NULL, blank=True, null=True)
+    rating = models.IntegerField(blank=True, null=True)
+    promotion_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    event_id = models.IntegerField(blank=True, null=True)
+>>>>>>> Stashed changes
 
     class Meta:
         managed = False
@@ -180,8 +203,8 @@ def update_is_featured(sender, instance, **kwargs):
 
 class ProductAd(models.Model):
     product_ad_id = models.AutoField(primary_key=True)
-    ad = models.ForeignKey(Ad, models.DO_NOTHING)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    ad = models.ForeignKey('Ad', models.DO_NOTHING)
+    product = models.ForeignKey('Product', models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -191,7 +214,7 @@ class ProductAd(models.Model):
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey('Product', models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -204,7 +227,7 @@ class ProductRecommendation(models.Model):
     recommended_at = models.DateTimeField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     category_id = models.IntegerField(blank=True, null=True)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey('Product', models.DO_NOTHING)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
@@ -215,7 +238,7 @@ class ProductRecommendation(models.Model):
 class ProductVideo(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
+    product = models.ForeignKey('Product', models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -265,17 +288,6 @@ class ShopInfo(models.Model):
         db_table = 'shop_info'
 
 
-class Subcategory(models.Model):
-    subcategory_id = models.AutoField(primary_key=True)
-    category = models.ForeignKey(Category, models.DO_NOTHING, blank=True, null=True)
-    subcategory_name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'subcategory'
-
-
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
@@ -303,7 +315,7 @@ class UserBankAccount(models.Model):
     account_number = models.CharField(max_length=20)
     account_holder_name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=50, blank=True, null=True)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -315,9 +327,19 @@ class UserBrowsingBehavior(models.Model):
     activity_type = models.CharField(max_length=50)
     interaction_value = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     timestamp = models.DateTimeField(blank=True, null=True)
-    product = models.ForeignKey(Product, models.DO_NOTHING)
-    user = models.ForeignKey(User, models.DO_NOTHING)
+    product = models.ForeignKey('Product', models.DO_NOTHING)
+    user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
         managed = False
         db_table = 'user_browsing_behavior'
+
+class ShippingAddress(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shipping_address')
+    recipient_name = models.CharField(max_length=255)
+    recipient_phone = models.CharField(max_length=20)
+    recipient_address = models.TextField()
+
+    class Meta:
+        managed = False
+        db_table = 'shipping_address'

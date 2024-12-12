@@ -37,14 +37,14 @@ urlpatterns = [
     path('latest-comments/', views.get_latest_comments, name='latest_comments'),
 
     # Filter APIs
-    path('filter/category/', filter_by_category, name='filter_by_category'),
-    path('filter/price/', filter_by_price, name='filter_by_price'),
-    path('filter/color/', filter_by_color, name='filter_by_color'),
-    path('filter/brand/', filter_by_brand, name='filter_by_brand'),
-    path('filter/stock-status/', filter_by_stock_status, name='filter_by_stock_status'),
+    path('filter/category/', views.filter_by_category, name='filter_by_category'),
+    path('filter/price/', views.filter_by_price, name='filter_by_price'),
+    path('filter/color/', views.filter_by_color, name='filter_by_color'),
+    path('filter/brand/', views.filter_by_brand, name='filter_by_brand'),
+    path('filter/stock/', views.filter_by_stock_status, name='filter_by_stock'),
 
     # Search API
-    path('search/', filter_page, name='search_products'),
+    path('search/', views.filter_page, name='search_products'),
 
     # General filter page API (both search and filter)
     path('filter/', filter_page, name='filter_page'),
