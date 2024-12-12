@@ -44,6 +44,12 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'email', 'full_name', 'role_name', 'created_at', 'updated_at']
 
+class LoginUserSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='role.role_name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['user_id', 'username', 'email', 'full_name', 'role', 'created_at', 'updated_at']
 # class UserBankAccountSerializer(serializers.ModelSerializer):
 #     user_id = serializers.IntegerField(source='user.user_id', read_only=True)  # Get the user_id from the related User model
 

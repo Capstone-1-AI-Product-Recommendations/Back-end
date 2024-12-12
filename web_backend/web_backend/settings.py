@@ -31,16 +31,13 @@ SITE_ID = 1
 # Application definition
 
 INSTALLED_APPS = [
-    # Django default apps
     'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
-    'django.contrib.contenttypes',
+    'django.contrib.contenttypes',  # Đảm bảo rằng dòng này có trong INSTALLED_APPS
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # `sites` app cần trước các app liên quan đến allauth
-    # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
     'dj_rest_auth',
@@ -59,21 +56,17 @@ INSTALLED_APPS = [
     'admin_dashboard',
     'orders',
     'payments',
-    'recommendations',
-    # 'seller_dashboard',     ?
+    'recommendations',    
     'web_backend.apps.WebBackendConfig',
 ]
 
 MIGRATION_MODULES = {
-    # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
-    # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
-    'admin': None,  # Ngừng tạo bảng cho 'admin'
-    'messages': None,  # Ngừng tạo bảng cho 'messages'
-    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
-    # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
-    'authtoken': None,  # Ngừng tạo bảng 'authtoken'
-    'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
-    'socialaccount': None,  # Ngừng tạo bảng 'socialaccount' nếu bạn không dùng Social Authentication
+    'admin': None,
+    'messages': None,
+    'staticfiles': None,
+    'authtoken': None,
+    'account': None,
+    'socialaccount': None,
     'social_django': None,
 }
 
@@ -161,7 +154,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'capstone1',
         'USER': 'root',
-        'PASSWORD': 'nhc171103',
+        'PASSWORD': '12345',
         'HOST': 'localhost',
         'PORT': '3306', 
         'OPTIONS': {
@@ -273,4 +266,3 @@ PAYOS_API_URL = 'https://payosapi.com/transaction'
 
 
 JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'
-

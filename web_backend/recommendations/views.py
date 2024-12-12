@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 
 # Tải các mô hình đã huấn luyện
-svd = joblib.load('./models/svd_model.pkl')
-tfidf = joblib.load('./models/tfidf_model.pkl')
-cosine_sim = joblib.load('./models/cosine_sim.pkl')
-user_similarity = joblib.load('./models/user_similarity.pkl')
-user_item_matrix = joblib.load('./models/user_item_matrix.pkl')
+svd = joblib.load('recommendations/models/svd_model.pkl')
+tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
+cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
+user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
+user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')
 
 # Hàm Hybrid Recommendation
 def hybrid_recommendation(user_item_matrix, cosine_sim, svd, user_similarity, product_id, top_n=10):

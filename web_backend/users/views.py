@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
-from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer, UserSerializer
+from .serializers import LoginUserSerializer, RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer, UserSerializer
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
@@ -112,7 +112,8 @@ def login_view(request):
                 user = User.objects.get(username=username)
                 if check_password(password, user.password):
                     token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
-                    response = Response({'message': 'Login successful'}, status=status.HTTP_200_OK)
+                    user_serializer = LoginUserSerializer(user) 
+                    response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)
                     response.set_cookie(
                         'user_token',  # Cookie name
                         token,  # Token value
