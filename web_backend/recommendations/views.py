@@ -11,13 +11,12 @@ import numpy as np
 import pandas as pd
 from django.db.models import Avg, Count, Sum
 
-
 # Tải các mô hình đã huấn luyện
-svd = joblib.load('recommendations/models/svd_model.pkl')
-tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
-cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
-user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
-user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')
+joblib.dump('svd', 'recommendations/models/svd_model.pkl')
+joblib.dump('tfidf', 'recommendations/models/tfidf_model.pkl')
+joblib.dump('cosine_sim', 'recommendations/models/cosine_sim.pkl')
+joblib.dump('user_similarity', 'recommendations/models/user_similarity.pkl')
+joblib.dump('user_item_matrix', 'recommendations/models/user_item_matrix.pkl')
 
 # Hàm Hybrid Recommendation
 def hybrid_recommendation(user_item_matrix, cosine_sim, svd, user_similarity, product_id, user_id, top_n=10):

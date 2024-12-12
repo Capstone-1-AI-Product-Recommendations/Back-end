@@ -150,16 +150,6 @@ class Product(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     quantity = models.IntegerField()
-<<<<<<< Updated upstream
-    subcategory = models.ForeignKey('Subcategory', models.DO_NOTHING, blank=True, null=True)
-    is_featured = models.BooleanField(default=False)  # Sửa thành BooleanField
-    color = models.CharField(max_length=100, blank=True, null=True)
-    brand = models.CharField(max_length=100, blank=True, null=True)
-    rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
-    shop = models.ForeignKey('Shop', models.DO_NOTHING, blank=True, null=True)
-    promotion_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Thêm trường này
-    event_id = models.IntegerField(blank=True, null=True)  # Thêm trường này
-=======
     subcategory = models.ForeignKey('Subcategory', on_delete=models.SET_NULL, blank=True, null=True)
     is_featured = models.BooleanField(default=False)
     color = models.CharField(max_length=100, blank=True, null=True)
@@ -169,7 +159,6 @@ class Product(models.Model):
     rating = models.IntegerField(blank=True, null=True)
     promotion_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     event_id = models.IntegerField(blank=True, null=True)
->>>>>>> Stashed changes
 
     class Meta:
         managed = False

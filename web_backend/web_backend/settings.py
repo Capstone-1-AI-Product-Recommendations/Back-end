@@ -70,7 +70,7 @@ MIGRATION_MODULES = {
     'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
     'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'
-    'contenttypes': None,  # ngừng tạo bảng contenttypes
+    # 'contenttypes': None,  # ngừng tạo bảng contenttypes
     # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
     'authtoken': None,  # Ngừng tạo bảng 'authtoken'
     'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự

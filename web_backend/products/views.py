@@ -19,9 +19,6 @@ import random
 from django.db.models import Q
 from django.urls import reverse
 from django.db.models import Sum, Avg, F
-
-
-# Import get_recommended_products correctly
 from recommendations.views import get_recommended_products
 
 # API to retrieve product details by product ID

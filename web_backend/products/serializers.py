@@ -88,7 +88,7 @@ class ProductSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(source='comment_set', many=True, read_only=True)
     ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
     recommendations = ProductRecommendationSerializer(source='productrecommendation_set', many=True, read_only=True)
-    computed_rating = serializers.FloatField(source='computed_rating', read_only=True)
+    computed_rating = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Product
