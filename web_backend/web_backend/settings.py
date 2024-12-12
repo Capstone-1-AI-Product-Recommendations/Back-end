@@ -65,11 +65,12 @@ INSTALLED_APPS = [
 ]
 
 MIGRATION_MODULES = {
-    'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
-    'sessions': None,  # Ngừng tạo bảng cho 'sessions'
+    # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
+    # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
     'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
-    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
+    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'
+    'contenttypes': None,  # ngừng tạo bảng contenttypes
     # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
     'authtoken': None,  # Ngừng tạo bảng 'authtoken'
     'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
@@ -159,7 +160,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 DATABASES = {  
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'capstone_1',
+        'NAME': 'cap1',
         'USER': 'root',
         'PASSWORD': 'anhtu123',
         'HOST': 'localhost',

@@ -7,9 +7,6 @@ from .views import (
     filter_by_stock_status, filter_page
 )
 
-from . import views
-
-
 urlpatterns = [
     # Product-related URLs
     path('products/detail/<int:product_id>/', product_detail, name='product_detail'),
