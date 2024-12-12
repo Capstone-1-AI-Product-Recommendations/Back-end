@@ -41,3 +41,6 @@ opencv-python
 imageio[ffmpeg]
 python-decouple
 payos
+joblib
+pandas
+scikit-learn
