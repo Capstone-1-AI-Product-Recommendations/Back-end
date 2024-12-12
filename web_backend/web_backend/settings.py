@@ -67,7 +67,7 @@ INSTALLED_APPS = [
 MIGRATION_MODULES = {
     # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
     # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
-    'admin': None,  # Ngừng tạo bảng cho 'admin'
+    # 'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
     'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
     # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
@@ -273,4 +273,11 @@ PAYOS_API_URL = 'https://payosapi.com/transaction'
 
 
 JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'
+
+VNPAY_CONFIG = {
+    "vnp_TmnCode": "1TZRD0CR",
+    "vnp_HashSecret": "2014BSCRHGFHJ3X8VKQG7BC9LP535QHZ",
+    "vnp_Url": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+    "vnp_ReturnUrl": "http://127.0.0.1:8000/api/vnpay-return/",
+}
 
