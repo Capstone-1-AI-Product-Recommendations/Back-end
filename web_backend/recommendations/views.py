@@ -71,8 +71,9 @@ def recommend_for_new_user(product_id, top_n=5):
 
     return recommended_products
 
+
 @api_view(['GET'])
-@permission_classes([AllowAny])
+# @permission_classes([AllowAny])
 def get_recommended_products(request):
     try:
         # Lấy tham số
@@ -85,9 +86,18 @@ def get_recommended_products(request):
                 # Đề xuất sản phẩm phổ biến cho người dùng mới
                 popular_products = Product.objects.annotate(
                     sales_count=Sum('orderitem__quantity')
-                ).order_by('-sales_count')[:10]
+                ).order_by('-sales_count')[:10].prefetch_related('productimage_set')
 
-                serialized_data = ProductSerializer(popular_products, many=True).data
+                serialized_data = [
+                    {
+                        "product_id": product.product_id,
+                        "name": product.name,
+                        "description": product.description,
+                        "price": product.price,
+                        "images": [image.file for image in product.productimage_set.all()]
+                    }
+                    for product in popular_products
+                ]
                 return Response(serialized_data)
 
             else:
@@ -109,8 +119,19 @@ def get_recommended_products(request):
                 user_id
             )
 
-        recommended_products = Product.objects.filter(product_id__in=recommended_product_ids)
-        serialized_data = ProductSerializer(recommended_products, many=True).data
+        recommended_products = Product.objects.filter(product_id__in=recommended_product_ids).prefetch_related(
+            'productimage_set')
+
+        serialized_data = [
+            {
+                "product_id": product.product_id,
+                "name": product.name,
+                "description": product.description,
+                "price": product.price,
+                "images": [image.file for image in product.productimage_set.all()]
+            }
+            for product in recommended_products
+        ]
 
         return Response(serialized_data)
 

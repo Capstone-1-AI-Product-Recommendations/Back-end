@@ -144,29 +144,50 @@ def delete_product(request, seller_id, shop_info_id, product_id):
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
-    featured_products = Product.objects.filter(is_featured=True)[:6]
-    serialized_data = ProductSerializer(featured_products, many=True).data
+    featured_products = Product.objects.filter(is_featured=True).prefetch_related('productimage_set')[:6]
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "images": [
+                image.file for image in product.productimage_set.all()
+            ]
+        }
+        for product in featured_products
+    ]
     return Response(serialized_data)
 
 # API to get trending products based on various criteria
 @api_view(['GET'])
 def get_trending_products(request):
-    # Annotate products with various metrics
     trending_products = Product.objects.annotate(
-        total_sales=Sum('orderitem__quantity'),  # Total quantity sold
-        total_views=Count('userbrowsingbehavior__product'),  # Total views
-        total_cart_adds=Count('cartitem__product')  # Total times added to cart
+        total_sales=Sum('orderitem__quantity'),
+        total_views=Count('userbrowsingbehavior__product'),
+        total_cart_adds=Count('cartitem__product')
     ).annotate(
-        # Calculate a composite score based on the criteria
         trending_score=(
-            F('total_sales') * 0.4 +  # Weight for sales
-            F('total_views') * 0.3 +  # Weight for views
-            F('total_cart_adds') * 0.2 +  # Weight for cart adds
-            F('rating') * 0.1  # Weight for rating
+            F('total_sales') * 0.4 +
+            F('total_views') * 0.3 +
+            F('total_cart_adds') * 0.2 +
+            F('rating') * 0.1
         )
-    ).order_by('-trending_score')[:8]  # Order by the composite score
+    ).order_by('-trending_score').prefetch_related('productimage_set')[:8]
 
-    serialized_data = ProductSerializer(trending_products, many=True).data
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "trending_score": product.trending_score,
+            "images": [
+                image.file for image in product.productimage_set.all()
+            ]
+        }
+        for product in trending_products
+    ]
     return Response(serialized_data)
 
 # API to get random products (28 random products)
@@ -177,8 +198,20 @@ def get_random_products(request):
         list(Product.objects.values_list('product_id', flat=True)),
         min(28, product_count)
     )
-    random_products = Product.objects.filter(product_id__in=random_ids)
-    serialized_data = ProductSerializer(random_products, many=True).data
+    random_products = Product.objects.filter(product_id__in=random_ids).prefetch_related('productimage_set')
+
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "images": [
+                image.file for image in product.productimage_set.all()
+            ]
+        }
+        for product in random_products
+    ]
     return Response(serialized_data)
 
 # API to get popular categories (Top 3 categories with most subcategories)
