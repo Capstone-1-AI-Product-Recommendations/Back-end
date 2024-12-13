@@ -12,11 +12,11 @@ import pandas as pd
 from django.db.models import Avg, Count, Sum
 
 # Tải các mô hình đã huấn luyện
-joblib.dump('svd', 'recommendations/models/svd_model.pkl')
-joblib.dump('tfidf', 'recommendations/models/tfidf_model.pkl')
-joblib.dump('cosine_sim', 'recommendations/models/cosine_sim.pkl')
-joblib.dump('user_similarity', 'recommendations/models/user_similarity.pkl')
-joblib.dump('user_item_matrix', 'recommendations/models/user_item_matrix.pkl')
+svd = joblib.load('recommendations/models/svd_model.pkl')
+tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
+cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
+user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
+user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')
 
 # Hàm Hybrid Recommendation
 def hybrid_recommendation(user_item_matrix, cosine_sim, svd, user_similarity, product_id, user_id, top_n=10):
@@ -76,16 +76,14 @@ def recommend_for_new_user(product_id, top_n=5):
 # @permission_classes([AllowAny])
 def get_recommended_products(request):
     try:
-        # Lấy tham số
         product_id = request.GET.get('product_id', '').strip()
         user_id = request.GET.get('user_id', '').strip()
 
         # Xử lý khi không có product_id
         if not product_id:
             if not user_id or user_id == '0':
-                # Đề xuất sản phẩm phổ biến cho người dùng mới
                 popular_products = Product.objects.annotate(
-                    sales_count=Sum('orderitem__quantity')
+                    sales_count=Sum('orderitem__quantity', default=0)
                 ).order_by('-sales_count')[:10].prefetch_related('productimage_set')
 
                 serialized_data = [
@@ -94,7 +92,7 @@ def get_recommended_products(request):
                         "name": product.name,
                         "description": product.description,
                         "price": product.price,
-                        "images": [image.file for image in product.productimage_set.all()]
+                        "images": [image.file for image in product.productimage_set.all()] if product.productimage_set.exists() else []
                     }
                     for product in popular_products
                 ]
@@ -103,12 +101,18 @@ def get_recommended_products(request):
             else:
                 return Response({"error": "product_id is required for existing users"}, status=400)
 
+        if not product_id.isdigit():
+            return Response({"error": "Invalid product_id"}, status=400)
+
         product_id = int(product_id)
 
         # Xử lý người dùng mới hoặc người dùng hiện tại
         if not user_id or user_id == '0':
             recommended_product_ids = recommend_for_new_user(product_id)
         else:
+            if not user_id.isdigit():
+                return Response({"error": "Invalid user_id"}, status=400)
+
             user_id = int(user_id)
             recommended_product_ids = hybrid_recommendation(
                 user_item_matrix,
@@ -128,7 +132,7 @@ def get_recommended_products(request):
                 "name": product.name,
                 "description": product.description,
                 "price": product.price,
-                "images": [image.file for image in product.productimage_set.all()]
+                "images": [image.file for image in product.productimage_set.all()] if product.productimage_set.exists() else []
             }
             for product in recommended_products
         ]
