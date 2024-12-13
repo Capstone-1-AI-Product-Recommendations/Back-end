@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from orders.serializers import OrderSerializer, OrderItemSerializer
-from web_backend.models import ShopInfo, Shop, User, Product, Order, OrderItem, Ad, ProductAd, Notification, Comment, ProductRecommendation
+from web_backend.models import *
 from .serializers import ShopInfoSerializer, ShopSerializer, ProductSerializer, SellOrderSerializer, SellOrderItemSerializer, AdSerializer, ProductAdSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
 # seller_dashboard/views.py
 from django.shortcuts import render
@@ -96,6 +96,10 @@ def update_order_status(request, order_item_id, seller_id):
             # Cập nhật trạng thái đơn hàng từ 'Pending' sang 'Confirmed'
             order.status = 'Confirmed'
             order.save()
+            purchased_products = PurchasedProduct.objects.filter(order_id=order.order_id)
+            for purchased_product in purchased_products:
+                purchased_product.status = 'Confirmed'  # Hoặc giá trị trạng thái khác tùy vào yêu cầu
+                purchased_product.save()
             return Response({"message": "Trạng thái đơn hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
     
     except OrderItem.DoesNotExist:

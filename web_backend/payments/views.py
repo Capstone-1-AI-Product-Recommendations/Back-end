@@ -8,14 +8,13 @@ from django.http import HttpResponseRedirect
 from urllib.parse import quote
 from payos import PayOS
 from payos.type import PaymentData, ItemData
-import hashlib, hmac
+import hashlib, hmac, json
 from django.shortcuts import get_object_or_404
 from decimal import Decimal
-from .serializers import OrderCODResponseSerializer, OrderSerializer, OrderItemSerializer
+from .serializers import *
 from web_backend.utils import transfer_funds
-from django.utils import timezone
 from datetime import datetime
-from urllib.parse import urlencode
+import urllib.parse 
 
 # Khởi tạo đối tượng PayOS
 payOS = PayOS(
@@ -235,152 +234,110 @@ def process_transfer(request, admin_id, order_id, seller_id):
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
        
-# Hàm chuyển đổi dữ liệu cho VNPay
-def convert_data_for_vnpay(order):
-    """
-    Hàm chuyển đổi dữ liệu từ DB phù hợp với yêu cầu của VNPay.
-    """
-    # Chuyển đổi order_id (số nguyên)
-    order_id = int(order.order_id)
-    
-    # Chuyển đổi total_amount (tính theo đồng, nhân với 100)
-    total_amount = int(order.total * 100)
-    
-    # Chuyển đổi created_at sang định dạng yyyyMMddHHmmss
-    created_at = order.created_at.strftime('%Y%m%d%H%M%S')
-    
-    # Lấy thông tin người dùng
-    user = order.user
-    
-    # Lấy địa chỉ IP từ request nếu có
-    ip_addr = "127.0.0.1"  # Bạn có thể lấy địa chỉ IP từ request
-
-    # Chuyển đổi các tham số thành dictionary
-    data = {
-        'order_id': order_id,
-        'total_amount': total_amount,
-        'created_at': created_at,
-        'user_id': user.user_id,
-        'email': user.email,
-        'ip_addr': ip_addr,
-    }
-    
-    return data
-
-# Lớp VNPay dùng để tạo URL thanh toán
 class VNPay:
-    def __init__(self, config):
-        self.config = config
+    requestData = {}
+    responseData = {}
 
-    def create_payment_url(self, order_data):
-        # Lấy thông tin cấu hình
-        vnp_TmnCode = self.config['vnp_TmnCode']
-        vnp_HashSecret = self.config['vnp_HashSecret']
-        vnp_Url = self.config['vnp_Url']
-        vnp_ReturnUrl = self.config['vnp_ReturnUrl']
+    def get_payment_url(self, payment_url, secret_key):
+        inputData = sorted(self.requestData.items())
+        queryString = "&".join(f"{key}={urllib.parse.quote_plus(str(val))}" for key, val in inputData)
+        hashValue = self.__hmacsha512(secret_key, queryString)
+        return f"{payment_url}?{queryString}&vnp_SecureHash={hashValue}"
 
-        # Tạo tham số thanh toán từ dữ liệu đã chuyển đổi
-        params = {
-            "vnp_Version": "2.1.0",
-            "vnp_Command": "pay",
-            "vnp_TmnCode": vnp_TmnCode,
-            "vnp_Amount": order_data['total_amount'],  # Đã chuyển đổi sang integer
-            "vnp_CurrCode": "VND",
-            "vnp_TxnRef": str(order_data['order_id']),  # Mã tham chiếu đơn hàng
-            "vnp_OrderInfo": f"Thanh toán đơn hàng {order_data['order_id']}",
-            "vnp_Locale": "vn",
-            "vnp_ReturnUrl": vnp_ReturnUrl,
-            "vnp_IpAddr": order_data['ip_addr'],  # Địa chỉ IP của người dùng
-            "vnp_CreateDate": order_data['created_at'],  # Đã chuyển đổi sang định dạng yyyyMMddHHmmss
-            "vnp_BillEmail": order_data['email'],  # Email người dùng
-            "vnp_UserID": order_data['user_id'],  # User ID người dùng
-        }
+    def validate_response(self, secret_key):
+        secure_hash = self.responseData.pop('vnp_SecureHash', None)
+        self.responseData.pop('vnp_SecureHashType', None)
+        sorted_data = sorted(self.responseData.items())
+        data_string = "&".join(f"{key}={urllib.parse.quote_plus(str(val))}" for key, val in sorted_data)
+        return secure_hash == self.__hmacsha512(secret_key, data_string)
 
-        # Sắp xếp tham số theo thứ tự a-z
-        sorted_params = sorted(params.items())
-        query_string = urlencode(sorted_params)
+    @staticmethod
+    def __hmacsha512(key, data):
+        byteKey = key.encode('utf-8')
+        byteData = data.encode('utf-8')
+        return hmac.new(byteKey, byteData, hashlib.sha512).hexdigest()
 
-        # Tạo SecureHash sử dụng HMACSHA512
-        hash_data = '&'.join([f"{key}={value}" for key, value in sorted_params])
-        vnp_SecureHash = hmac.new(
-            vnp_HashSecret.encode('utf-8'),
-            hash_data.encode('utf-8'),
-            hashlib.sha512
-        ).hexdigest()
 
-        # Gắn SecureHash vào URL
-        payment_url = f"{vnp_Url}?{query_string}&vnp_SecureHash={vnp_SecureHash}"
-        return payment_url
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    return x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+
 
 @api_view(['GET', 'POST'])
 def vnpay(request, user_id, order_id):
     try:
-        # Lấy thông tin đơn hàng và kiểm tra user_id
-        try:
-            order = Order.objects.get(order_id=order_id, user_id=user_id)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found or does not belong to the user"}, status=status.HTTP_404_NOT_FOUND)
+        order = Order.objects.get(order_id=order_id, user_id=user_id)
+        bank_account = UserBankAccount.objects.get(user_id=user_id)
 
-        # Khai báo biến order_data trước
-        order_data = convert_data_for_vnpay(order)
+        # Mã ngân hàng (cần kiểm tra và ánh xạ từ account_number -> bank_code nếu có)
+        bank_code = "NCB"  # Thay bằng mã ngân hàng thực tế, hoặc để trống nếu không chắc chắn
+    except (Order.DoesNotExist, UserBankAccount.DoesNotExist):
+        return Response({"error": "Không tìm thấy thông tin đơn hàng hoặc tài khoản ngân hàng"}, status=404)
 
-        if request.method == 'GET':
-            # Trả về thông tin đơn hàng để xem trước, sửa lại total_amount và created_at
-            return Response(order_data, status=status.HTTP_200_OK)
+    if request.method == 'GET':
+        return Response({
+            "vnp_TxnRef": str(order.order_id),
+            "vnp_Amount": int(order.total * 100),
+            "vnp_CurrCode": "VND",
+            "vnp_OrderInfo": f"Thanh toán đơn hàng {order.order_id}",
+            "vnp_OrderType": "other",
+            "vnp_Locale": "vn",
+            "vnp_BankCode": bank_code,  # Hoặc để ''
+        })
 
-        elif request.method == 'POST':
-            # Chỉ cho phép thanh toán nếu trạng thái đơn hàng là "Pending"
-            if order.status != "Pending":
-                return Response({"error": "Order is not eligible for payment"}, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'POST':
+        vnp = VNPay()
+        vnp.requestData.update({
+            'vnp_Version': '2.1.0',
+            'vnp_Command': 'pay',
+            'vnp_TmnCode': settings.VNPAY_TMN_CODE,
+            'vnp_Amount': int(order.total * 100),
+            'vnp_CurrCode': 'VND',
+            'vnp_TxnRef': str(order.order_id),
+            'vnp_OrderInfo': f"Thanh toán đơn hàng {order.order_id}",
+            'vnp_OrderType': 'other',
+            'vnp_Locale': 'vn',
+            'vnp_BankCode': bank_code,  # Hoặc để ''
+            'vnp_CreateDate': datetime.now().strftime('%Y%m%d%H%M%S'),
+            'vnp_IpAddr': get_client_ip(request),
+            'vnp_ReturnUrl': settings.VNPAY_RETURN_URL
+        })
 
-            # Tạo URL thanh toán với VNPay
-            vnpay = VNPay(settings.VNPAY_CONFIG)
-            payment_url = vnpay.create_payment_url(order_data)
+        payment_url = vnp.get_payment_url(settings.VNPAY_PAYMENT_URL, settings.VNPAY_HASH_SECRET_KEY)
+        return Response({'payment_url': payment_url})
 
-            # Trả về URL thanh toán
-            return Response({"payment_url": payment_url}, status=status.HTTP_200_OK)
 
-    except Exception as e:
-        # In ra chi tiết lỗi
-        print(f"Error occurred: {e}")
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['GET'])
-def vnpay_return(request):
-    try:
-        # Lấy các tham số trả về từ VNPay
-        vnp_response = request.GET.dict()
-        vnp_SecureHash = vnp_response.pop('vnp_SecureHash', None)
+def payment_return(request):
+    input_data = request.GET.dict()
+    vnp = VNPay()
+    vnp.responseData = input_data
 
-        # Tạo lại SecureHash từ các tham số trả về
-        sorted_params = sorted(vnp_response.items())
-        hash_data = '&'.join([f"{key}={value}" for key, value in sorted_params])
-        vnp_HashSecret = settings.VNPAY_CONFIG['vnp_HashSecret']
-        secure_hash_check = hmac.new(
-            vnp_HashSecret.encode('utf-8'),
-            hash_data.encode('utf-8'),
-            hashlib.sha512
-        ).hexdigest()
+    if vnp.validate_response(settings.VNPAY_HASH_SECRET_KEY):
+        response_code = input_data.get('vnp_ResponseCode')
+        if response_code == '00':
+            return Response({"result": "success", "data": input_data})
+        return Response({"result": "failure", "data": input_data})
 
-        # Kiểm tra SecureHash có hợp lệ không
-        if secure_hash_check != vnp_SecureHash:
-            return Response({"error": "Invalid secure hash"}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"result": "invalid_signature", "data": input_data})
 
-        # Kiểm tra mã phản hồi từ VNPay
-        if vnp_response.get('vnp_ResponseCode') == '00':  # Mã phản hồi thành công
-            order_id = vnp_response.get('vnp_TxnRef')
-            payment = Payment.objects.get(transaction_id=order_id)
-            payment.status = 'Completed'
-            payment.save()
 
-            # Cập nhật trạng thái đơn hàng
-            order = payment.order
-            order.status = 'Paid'
-            order.save()
+@api_view(['GET'])
+def payment_ipn(request):
+    input_data = request.GET.dict()
+    vnp = VNPay()
+    vnp.responseData = input_data
 
-            return Response({"success": "Payment successful"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "Payment failed"}, status=status.HTTP_400_BAD_REQUEST)
+    if vnp.validate_response(settings.VNPAY_HASH_SECRET_KEY):
+        response_code = input_data.get('vnp_ResponseCode')
+        order_id = input_data.get('vnp_TxnRef')
+        amount = int(input_data.get('vnp_Amount', 0)) / 100
 
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Logic to verify and update order status goes here
+
+        if response_code == '00':
+            return Response({'RspCode': '00', 'Message': 'Confirm Success'})
+        return Response({'RspCode': '99', 'Message': 'Payment failed'})
+    return Response({'RspCode': '97', 'Message': 'Invalid signature'})

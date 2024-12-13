@@ -140,7 +140,6 @@ class Notification(models.Model):
         managed = False
         db_table = 'notification'
 
-
 class Order(models.Model):
     order_id = models.AutoField(primary_key=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
@@ -305,3 +304,25 @@ class ShippingAddress(models.Model):
     class Meta:
         managed = False
         db_table = 'shipping_address'
+
+class PurchasedProduct(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    purchased_product_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchased_products')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='purchases')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='sold_products')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='purchased_products')  # Liên kết với đơn hàng
+    quantity = models.IntegerField()
+    price_at_purchase = models.DecimalField(max_digits=15, decimal_places=2)  # Lưu giá sản phẩm tại thời điểm mua
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    purchased_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'purchased_product'
+

@@ -1,9 +1,10 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from web_backend.models import Order, OrderItem, CartItem, User , ShippingAddress
+from web_backend.models import PurchasedProduct, Order, OrderItem, CartItem, User , ShippingAddress
 from .serializers import OrderSerializer, ShippingAddressSerializer
 import json
+from django.utils import timezone
 
 @api_view(['POST'])
 def create_order(request, user_id):
@@ -45,6 +46,17 @@ def create_order(request, user_id):
             product=product,
             quantity=quantity,
             price=price * quantity,
+        )
+        # Lưu thông tin xuống PurchasedProduct
+        PurchasedProduct.objects.create(
+            user=user,
+            product=product,
+            shop=product.shop,  # Giả định mỗi sản phẩm liên kết với shop qua `product.shop`
+            order=order,
+            quantity=quantity,
+            price_at_purchase=price,
+            status='pending',  # Mặc định trạng thái ban đầu là `completed`
+            purchased_at=timezone.now(),  # Ngày giờ mua
         )
 
     order.total = total_amount

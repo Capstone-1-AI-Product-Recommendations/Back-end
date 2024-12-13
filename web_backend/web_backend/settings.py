@@ -274,10 +274,8 @@ PAYOS_API_URL = 'https://payosapi.com/transaction'
 
 JWT_SECRET_KEY = '374d5d1989a469dbb87700d89e59ddf2cd443adb2f5bfe3f7fc94d276988081a'
 
-VNPAY_CONFIG = {
-    "vnp_TmnCode": "1TZRD0CR",
-    "vnp_HashSecret": "2014BSCRHGFHJ3X8VKQG7BC9LP535QHZ",
-    "vnp_Url": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
-    "vnp_ReturnUrl": "http://127.0.0.1:8000/api/vnpay-return/",
-}
+VNPAY_TMN_CODE = '1TZRD0CR'  # Terminal ID của VNPAY
+VNPAY_HASH_SECRET_KEY = '2014BSCRHGFHJ3X8VKQG7BC9LP535QHZ'  # Secret Key
+VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'  # URL thanh toán VNPAY trong môi trường thử nghiệm
+VNPAY_RETURN_URL = 'http://example.com/payment_return'
 
