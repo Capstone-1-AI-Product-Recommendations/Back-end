@@ -176,19 +176,19 @@ def get_trending_products(request):
             F('total_cart_adds') * 0.2 +
             F('rating') * 0.1
         )
-    ).order_by('-trending_score').prefetch_related('productimage_set')[:8]
+    ).order_by('-trending_score').prefetch_related('productimage_set')[:12]
 
     serialized_data = [
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description
-                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
+            # "description": product.description
+            #     .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
+            #     .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
+            #     .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
             "trending_score": product.trending_score,
-            "images": [
+            "altImages": [
                 image.file for image in product.productimage_set.all()
             ]
         }

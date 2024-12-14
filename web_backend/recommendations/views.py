@@ -13,64 +13,76 @@ from django.db.models import Avg, Count, Sum
 
 # Tải các mô hình đã huấn luyện
 svd = joblib.load('recommendations/models/svd_model.pkl')
-tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
+# tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
 cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
 user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
 user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')
 
+from sklearn.preprocessing import MinMaxScaler
+
+# Loại bỏ sự tương đồng chính nó
+np.fill_diagonal(cosine_sim, 0)
+
+# Chuẩn hóa ma trận cosine similarity
+scaler = MinMaxScaler()
+cosine_sim_normalized = scaler.fit_transform(cosine_sim)
 # Hàm Hybrid Recommendation
-def hybrid_recommendation(user_item_matrix, cosine_sim, svd, user_similarity, product_id, user_id, top_n=10):
+def hybrid_recommendation(user_item_matrix, cosine_sim_normalized, svd, user_similarity, product_id, user_id, top_n=10):
     user_idx = user_id - 1
     cf_scores = svd.inverse_transform(svd.transform(user_item_matrix))[user_idx]
-
+    
     try:
         product = Product.objects.get(product_id=product_id)
         product_idx = product.product_id - 1
     except Product.DoesNotExist:
         return []
-
-    cbf_scores = cosine_sim[product_idx]
+    
+    # Sử dụng ma trận cosine similarity đã chuẩn hóa
+    cbf_scores = cosine_sim_normalized[product_idx]
     user_idx_similarity = np.argsort(user_similarity[user_idx])[::-1]
     user_similarity_scores = user_similarity[user_idx, user_idx_similarity]
-
-    hybrid_scores = cf_scores + cbf_scores + user_similarity_scores[:len(cf_scores)]
+    
+    # Kết hợp CF, CBF và User-User Similarity
+    hybrid_scores = 0.2 * cf_scores + 0.5 * cbf_scores + 0.3 * user_similarity_scores[:len(cf_scores)]
     recommended_idx = np.argsort(hybrid_scores)[-top_n:][::-1]
-
+    
     recommended_products = []
     for idx in recommended_idx:
         product = Product.objects.filter(product_id=idx + 1).first()
         if product:
             recommended_products.append(product.product_id)
-
+    
     return recommended_products
 
 # Hàm đề xuất cho người dùng mới (Cold Start Problem)
 def recommend_for_new_user(product_id, top_n=5):
-    # 1. Đề xuất sản phẩm phổ biến (Sản phẩm có số lượt mua cao)
-    popular_products = Product.objects.order_by('-sales_count')[:top_n]  # Lấy sản phẩm phổ biến từ cơ sở dữ liệu
+    # 1. Đề xuất sản phẩm phổ biến (Top sản phẩm có lượng bán cao)
+    popular_products = Product.objects.annotate(
+        sales_count=Sum('orderitem__quantity')
+    ).order_by('-sales_count')[:top_n]  # Lấy top N sản phẩm phổ biến
+    
+    # Nếu không có sản phẩm phổ biến, trả về danh sách trống
+    if not popular_products:
+        return []
 
-    # 2. Tính sự tương đồng giữa sản phẩm mới với các sản phẩm khác (Content-based Filtering)
-    # Lấy chỉ mục của sản phẩm phẩm trong cơ sở dữ liệu
+    # 2. Tính sự tương đồng giữa sản phẩm được đưa vào và các sản phẩm khác (Content-based Filtering)
     try:
-        product_idx = Product.objects.get(product_id=product_id).id
+        product = Product.objects.get(product_id=product_id)
+        product_idx = product.product_id - 1  # Chuyển từ ID (1-based) sang index (0-based)
     except Product.DoesNotExist:
-        return []  # Trả về danh sách rỗng nếu s���n phẩm không tồn tại
+        return []  # Nếu sản phẩm không tồn tại, trả về danh sách trống
 
     cbf_scores = cosine_sim[product_idx]
+    similar_products_idx = np.argsort(cbf_scores)[-top_n:][::-1]  # Sắp xếp sản phẩm tương tự theo điểm cosine giảm dần
 
-    # 3. Kết hợp sản phẩm phổ biến với các sản phẩm có sự tương đồng cao từ CBF
-    # Sử dụng chỉ mục để truy vấn các sản phẩm có sự tương đồng cao
-    similar_products_idx = np.argsort(cbf_scores)[-top_n:][::-1]  # Sắp xếp các sản phẩm theo sự tương đồng giảm dần
+    # Lấy tất cả các sản phẩm tương tự từ CBF bằng cách lọc nhiều product_id cùng lúc
+    recommended_products = Product.objects.filter(product_id__in=[idx + 1 for idx in similar_products_idx])
 
-    # Lấy ID các sản phẩm tương tự từ danh sách đã sắp xếp
-    recommended_products = []
-    for idx in similar_products_idx:
-        product = Product.objects.filter(id=idx).first()
-        if product:
-            recommended_products.append(product.product_id)
-
-    return recommended_products
-
+    # Kết hợp sản phẩm phổ biến với sản phẩm tương tự từ CBF
+    recommended_product_ids = [product.product_id for product in popular_products] + [product.product_id for product in recommended_products]
+    
+    # Giới hạn số lượng sản phẩm đề xuất tối đa là top_n
+    return recommended_product_ids[:top_n]
 
 @api_view(['GET'])
 # @permission_classes([AllowAny])
