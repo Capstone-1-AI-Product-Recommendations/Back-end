@@ -14,8 +14,8 @@ class Ad(models.Model):
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -41,8 +41,8 @@ class User(models.Model):
     phone_number = models.CharField(max_length=30, blank=True, null=True)
     reset_token = models.CharField(max_length=50, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
@@ -54,8 +54,8 @@ class User(models.Model):
 
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -89,8 +89,8 @@ class Product(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=15, decimal_places=2)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     quantity = models.IntegerField()
     subcategory = models.ForeignKey(Subcategory, models.DO_NOTHING, blank=True, null=True)
     is_featured = models.IntegerField(blank=True, null=True)
@@ -120,7 +120,7 @@ class Comment(models.Model):
     comment_id = models.AutoField(primary_key=True)
     comment = models.TextField()
     rating = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     product = models.ForeignKey(Product, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
@@ -133,7 +133,7 @@ class Notification(models.Model):
     notification_id = models.AutoField(primary_key=True)
     message = models.TextField()
     is_read = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
 
     class Meta:
@@ -171,8 +171,8 @@ class Payment(models.Model):
     status = models.CharField(max_length=20)
     payment_method = models.CharField(max_length=50)
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
-    created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
     order = models.ForeignKey(Order, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
 

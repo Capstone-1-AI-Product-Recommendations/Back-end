@@ -15,6 +15,7 @@ from .serializers import *
 from web_backend.utils import transfer_funds
 from datetime import datetime
 import urllib.parse 
+from django.utils import timezone
 
 # Khởi tạo đối tượng PayOS
 payOS = PayOS(
@@ -89,7 +90,17 @@ def payos(request, user_id, order_id):
             )
             # Tạo liên kết thanh toán
             payment_link = payos.createPaymentLink(paymentData=payment_data)
-            
+            payment = Payment.objects.create(
+                amount=order.total,
+                status="Pending",  # Ban đầu trạng thái sẽ là Pending
+                payment_method="PayOS",  # Phương thức thanh toán (ví dụ)
+                transaction_id=None,  # Ghi sau khi thanh toán hoàn thành
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                order=order,
+                user=order.user
+            )
+
             # Trả về URL thanh toán cho người dùng
             return Response({
                 'payment_url': payment_link.checkoutUrl  # Lấy URL thanh toán
@@ -161,7 +172,6 @@ def payment_cod(request, user_id, order_id):
             },
             "items": items_details
         }
-
         # Serialize dữ liệu và trả về response
         return Response(response_data, status=status.HTTP_201_CREATED)
     
@@ -304,6 +314,14 @@ def vnpay(request, user_id, order_id):
         })
 
         payment_url = vnp.get_payment_url(settings.VNPAY_PAYMENT_URL, settings.VNPAY_HASH_SECRET_KEY)
+        payment = Payment.objects.create(
+            order=order,
+            user=order.user,
+            amount=order.total,
+            status="Pending",
+            payment_method="VNPay",
+            transaction_id=vnp.requestData['vnp_TxnRef']
+        )
         return Response({'payment_url': payment_url})
 
 
