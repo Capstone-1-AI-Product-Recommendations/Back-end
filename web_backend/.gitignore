@@ -3,7 +3,7 @@
 *$py.class
 *.pyc
 __pycache__/
-
+*.pkl
 # Ignore environment settings
 myenv/
 .env
