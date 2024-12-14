@@ -140,7 +140,7 @@ def delete_product(request, seller_id, shop_info_id, product_id):
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
-
+import re
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
@@ -149,7 +149,10 @@ def get_featured_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description,
+            "description": re.sub(
+                r'(\n\s*)+', '\n',  # Thay thế nhiều ký tự xuống dòng liên tiếp bằng 1 '\n'
+                str(product.description).replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),  # Loại bỏ khoảng trắng đầu/cuối
             "price": product.price,
             "images": [
                 image.file for image in product.productimage_set.all()
@@ -179,7 +182,10 @@ def get_trending_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description,
+            "description": product.description
+                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
+                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
+                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
             "trending_score": product.trending_score,
             "images": [
@@ -204,7 +210,10 @@ def get_random_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description,
+            "description": product.description
+                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
+                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
+                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
             "images": [
                 image.file for image in product.productimage_set.all()

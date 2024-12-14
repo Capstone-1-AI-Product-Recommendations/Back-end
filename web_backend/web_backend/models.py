@@ -109,6 +109,7 @@ class Order(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         managed = False
@@ -159,6 +160,8 @@ class Product(models.Model):
     rating = models.IntegerField(blank=True, null=True)
     promotion_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     event_id = models.IntegerField(blank=True, null=True)
+    sales_strategy = models.IntegerField(blank=True, null=True)
+    review_count = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -323,12 +326,12 @@ class UserBrowsingBehavior(models.Model):
         managed = False
         db_table = 'user_browsing_behavior'
 
-class ShippingAddress(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shipping_address')
-    recipient_name = models.CharField(max_length=255)
-    recipient_phone = models.CharField(max_length=20)
-    recipient_address = models.TextField()
-
-    class Meta:
-        managed = False
-        db_table = 'shipping_address'
+# class ShippingAddress(models.Model):
+#     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shipping_address')
+#     recipient_name = models.CharField(max_length=255)
+#     recipient_phone = models.CharField(max_length=20)
+#     recipient_address = models.TextField()
+#
+#     class Meta:
+#         managed = False
+#         db_table = 'shipping_address'
