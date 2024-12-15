@@ -3,6 +3,7 @@
 *$py.class
 *.pyc
 __pycache__/
+web_backend/recommendations/models/*.pkl
 
 # Ignore environment settings
 myenv/
@@ -34,3 +35,11 @@ media/
 # Ignore migrations
 */migrations/*.py
 !*/migrations/__init__.py
+
+
+# Bỏ qua tất cả tệp .pkl
+*.pkl
+
+# Bỏ qua các tệp trong thư mục models/
+web_backend/recommendations/models/*.pkl
+
