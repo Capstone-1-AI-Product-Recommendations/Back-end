@@ -1,4 +1,4 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, parser_classes 
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Count, Sum, F
@@ -19,7 +19,11 @@ import random
 from django.db.models import Q
 from django.urls import reverse
 from django.db.models import Sum, Avg, F
+
+from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 from recommendations.views import get_recommended_products
+from rest_framework.parsers import MultiPartParser, FormParser
+
 
 # API to retrieve product details by product ID
 @api_view(['GET'])
@@ -38,37 +42,45 @@ def product_detail(request, user_id, product_id):
 
 # API to create a new product
 @api_view(['POST'])
-def create_product(request, seller_id, shop_info_id):
+@parser_classes([MultiPartParser, FormParser])
+def create_product(request, seller_id, shop_id):
     try:
-        # Kiểm tra seller_id hợp lệ và là người bán
+        # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
         seller = User.objects.get(user_id=seller_id)
         if not seller.role or seller.role.role_name != "Seller":
             return Response({"detail": "Only sellers can create products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra shopinfo_id hợp lệ và lấy ShopInfo
+    
+    # Kiểm tra shop_id hợp lệ và lấy Shop
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Sao chép dữ liệu request.data thành một dict có thể sửa đổi
-    data = request.data.copy()
-    data['seller'] = seller_id  # Truyền seller_id vào request data
-    # Khởi tạo serializer để tạo sản phẩm
-    serializer = CRUDProductSerializer(data=data)
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Thêm seller_id vào request.data
+    request.data['seller'] = seller_id
+    
+    # Khởi tạo serializer với dữ liệu và context seller
+    serializer = CRUDProductSerializer(data=request.data, context={'seller': seller})
+
     if serializer.is_valid():
-        # Lưu sản phẩm và gán seller
-        product = serializer.save(seller=seller)
-        # Cập nhật số lượng sản phẩm trong ShopInfo
+        # Lưu sản phẩm, điều này sẽ tạo ra các hình ảnh và video liên quan
+        # product = serializer.save()
+        product = serializer.save(shop=shop)
+        # Cập nhật số lượng sản phẩm trong Shop
+        shop_info, created = ShopInfo.objects.get_or_create(shop=shop)
         shop_info.product_count += 1
         shop_info.save()
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # API to update a product by product ID
 @api_view(['PUT'])
-def update_product(request, seller_id, shop_info_id, product_id):
+@parser_classes([MultiPartParser, FormParser])
+def update_product(request, seller_id, shop_id, product_id):
     # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
         seller = User.objects.get(user_id=seller_id)
@@ -76,74 +88,87 @@ def update_product(request, seller_id, shop_info_id, product_id):
             return Response({"detail": "Only sellers can update products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+
+    # Kiểm tra shop_id hợp lệ và lấy Shop
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Truy xuất sản phẩm cần cập nhật thông qua mối quan hệ với User (seller)
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy sản phẩm cần cập nhật theo product_id và shop
     try:
-        # Kiểm tra sản phẩm có thuộc về seller hay không
-        product = Product.objects.get(product_id=product_id, seller=seller)        
-        # Kiểm tra sản phẩm có thuộc về shop tương ứng hay không
-        if product.seller == seller:  # Kiểm tra seller của sản phẩm
-            # Cập nhật sản phẩm (ví dụ: cập nhật tên sản phẩm và giá trị mới từ request)
-            product_name = request.data.get('name', product.name)
-            product_price = request.data.get('price', product.price)
-            product_quantity = request.data.get('quantity', product.quantity)
-            product_description = request.data.get('description', product.description)
-            # Lưu các thay đổi
-            product.name = product_name
-            product.price = product_price
-            product.quantity = product_quantity
-            product.description = product_description
-            product.save()
-            return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
-        else:
-            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
+        product = Product.objects.get(product_id=product_id, shop=shop)
     except Product.DoesNotExist:
-        return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"detail": "Product not found in the specified shop."}, status=status.HTTP_404_NOT_FOUND)
 
+    # Cập nhật thông tin sản phẩm
+    product_name = request.data.get('name', product.name)
+    product_price = request.data.get('price', product.price)
+    product_quantity = request.data.get('quantity', product.quantity)
+    product_description = request.data.get('description', product.description)
 
-    serializer = CRUDProductSerializer(product, data=request.data, partial=True)
-    if serializer.is_valid():
-        updated_product = serializer.save()
-        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Cập nhật các trường của sản phẩm
+    product.name = product_name
+    product.price = product_price
+    product.quantity = product_quantity
+    product.description = product_description
+
+    # Xử lý ảnh (nếu có ảnh mới)
+    images_data = request.FILES.getlist('images', [])
+    if images_data:
+        # Xóa các ảnh cũ nếu có
+        product.images.all().delete()
+        for image_data in images_data:
+            image_url = compress_and_upload_image(image_data)  # Hàm xử lý ảnh
+            ProductImage.objects.create(product=product, file=image_url)
+
+    # Xử lý video (nếu có video mới)
+    videos_data = request.FILES.getlist('videos', [])
+    if videos_data:
+        # Xóa các video cũ nếu có
+        product.videos.all().delete()
+        for video_data in videos_data:
+            video_url = compress_and_upload_video(video_data)  # Hàm xử lý video
+            ProductVideo.objects.create(product=product, file=video_url)
+
+    # Lưu các thay đổi
+    product.save()
+
+    return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
 
 @api_view(['DELETE'])
-def delete_product(request, seller_id, shop_info_id, product_id):
+def delete_product(request, seller_id, shop_id, product_id):
     # Kiểm tra seller_id hợp lệ và seller phải có vai trò "Seller"
     try:
         seller = User.objects.get(user_id=seller_id)
         if not seller.role or seller.role.role_name != "Seller":
             return Response({"detail": "Only sellers can delete products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
-        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
-    # Kiểm tra shop_info_id hợp lệ và lấy ShopInfo
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Kiểm tra shop_id hợp lệ và shop thuộc sở hữu của seller
     try:
-        shop_info = ShopInfo.objects.get(shop_info_id=shop_info_id, shop__user=seller)
-        shop = shop_info.shop  # Lấy thông tin shop từ shop_info
-    except ShopInfo.DoesNotExist:
-        return Response({"detail": "ShopInfo not found or this seller doesn't own this ShopInfo."}, status=status.HTTP_404_NOT_FOUND)
-    # Kiểm tra sản phẩm có thuộc về seller và shop hay không
+        shop = Shop.objects.get(shop_id=shop_id, user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found or this seller doesn't own this shop."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Kiểm tra sản phẩm có thuộc về shop hay không
     try:
-        product = Product.objects.get(product_id=product_id, seller=seller)
-        if product.seller == seller:
-            # Giảm số lượng sản phẩm trong ShopInfo
+        product = Product.objects.get(product_id=product_id, shop=shop)
+        # Giảm số lượng sản phẩm trong ShopInfo (nếu có liên kết với ShopInfo)
+        try:
+            shop_info = ShopInfo.objects.get(shop=shop)
             if shop_info.product_count > 0:
                 shop_info.product_count -= 1
                 shop_info.save()
-            # Xóa sản phẩm
-            product.delete()
-            return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
-        else:
-            return Response({"detail": "Product does not belong to this seller."}, status=status.HTTP_400_BAD_REQUEST)
+        except ShopInfo.DoesNotExist:
+            pass  # Nếu không có ShopInfo liên kết, bỏ qua
+        # Xóa sản phẩm
+        product.delete()
+        return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-
-import re
+    
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
@@ -179,25 +204,22 @@ def get_trending_products(request):
             F('total_cart_adds') * 0.2 +
             F('rating') * 0.1
         )
-    ).order_by('-trending_score').prefetch_related('productimage_set')[:12]
+    ).order_by('-trending_score').prefetch_related('images')[:12]  # Thay đổi từ 'productimage_set' thành 'images'
 
     serialized_data = [
         {
             "product_id": product.product_id,
             "name": product.name,
-            # "description": product.description
-            #     .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-            #     .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-            #     .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
             "trending_score": product.trending_score,
             "altImages": [
-                image.file for image in product.productimage_set.all()
+                image.file for image in product.images.all()  # Sử dụng 'images' thay cho 'productimage_set'
             ]
         }
         for product in trending_products
     ]
     return Response(serialized_data)
+
 
 # API to get random products (28 random products)
 @api_view(['GET'])
@@ -207,26 +229,11 @@ def get_random_products(request):
         list(Product.objects.values_list('product_id', flat=True)),
         min(28, product_count)
     )
-    random_products = Product.objects.filter(product_id__in=random_ids).prefetch_related('productimage_set')
-
-    serialized_data = [
-        {
-            "product_id": product.product_id,
-            "name": product.name,
-            "description": product.description
-                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
-            "price": product.price,
-            "images": [
-                image.file for image in product.productimage_set.all()
-            ]
-        }
-        for product in random_products
-    ]
+    random_products = Product.objects.filter(product_id__in=random_ids)
+    serialized_data = ProductSerializer(random_products, many=True).data
     return Response(serialized_data)
 
-# API to get popular categories (Top 3 categories with most subcategories)
+# API to get popular categories (Top 3 categories with most products)
 @api_view(['GET'])
 def get_popular_categories(request):
     # Annotate categories with the count of their subcategories
@@ -288,7 +295,7 @@ def homepage_api(request):
 def filter_by_category(request):
     category = request.GET.get('category')
     if category:
-        products = Product.objects.filter(subcategory__category__category_name__iexact=category)
+        products = Product.objects.filter(category__category_name__iexact=category)
         serialized_data = ProductSerializer(products, many=True).data
         return Response(serialized_data, status=200)
     return Response({"message": "Category parameter is required"}, status=400)
@@ -351,7 +358,6 @@ def filter_by_stock_status(request):
         return Response(serialized_data, status=200)
     return Response({"message": "stock_status parameter is required"}, status=400)
 
-
 # Tổng hợp API cho Filter_Page với các bộ lọc
 @api_view(['GET'])
 def filter_page(request):
@@ -368,10 +374,9 @@ def filter_page(request):
         print(f"After search: {products.count()}")  # Debug log
 
     # Bộ lọc theo category
-    category = request.GET.get('category', '').strip()
+    category = request.GET.get('category')
     if category:
-        products = products.filter(subcategory__category__category_name__iexact=category)
-        print(f"After category: {products.count()}")  # Debug log
+        products = products.filter(category__category_name__iexact=category)
 
     # Bộ lọc theo price
     min_price = request.GET.get('min_price')
@@ -381,56 +386,46 @@ def filter_page(request):
             min_price = float(min_price)
             max_price = float(max_price)
             products = products.filter(price__gte=min_price, price__lte=max_price)
-            print(f"After price: {products.count()}")  # Debug log
         except ValueError:
-            pass
+            return Response({"message": "Price parameters must be numeric"}, status=400)
 
     # Bộ lọc theo color
-    color = request.GET.get('color', '').strip()
+    color = request.GET.get('color')
     if color:
         products = products.filter(color__iexact=color)
-        print(f"After color: {products.count()}")  # Debug log
 
     # Bộ lọc theo brand
-    brand = request.GET.get('brand', '').strip()
+    brand = request.GET.get('brand')
     if brand:
         products = products.filter(brand__iexact=brand)
-        print(f"After brand: {products.count()}")  # Debug log
 
     # Bộ lọc theo stock status
-    stock_status = request.GET.get('stock_status', '').strip()
+    stock_status = request.GET.get('stock_status')
     if stock_status:
         if stock_status == 'in_stock':
             products = products.filter(quantity__gt=0)
         elif stock_status == 'out_of_stock':
             products = products.filter(quantity=0)
-        print(f"After stock: {products.count()}")  # Debug log
 
     # Bộ lọc theo city và province
-    city = request.GET.get('city', '').strip()
-    province = request.GET.get('province', '').strip()
+    city = request.GET.get('city')
+    province = request.GET.get('province')
     if city:
-        products = products.filter(shop__user__city__icontains=city)
-        print(f"After city: {products.count()}")  # Debug log
+        products = products.filter(seller__user__sellerprofile__city__icontains=city)
     if province:
-        products = products.filter(shop__user__province__icontains=province)
-        print(f"After province: {products.count()}")  # Debug log
+        products = products.filter(seller__sellerprofile__province__icontains=province)
 
     # Serialize sản phẩm
     products_serialized = ProductSerializer(products, many=True).data
 
-    # Lọc shop liên quan
-    related_shop_ids = products.values_list('shop_id', flat=True).distinct()
-    sellers = User.objects.filter(
-        shop__shop_id__in=related_shop_ids,
-        role__role_name='Seller'
-    )[:2]
+    # Lọc người bán liên quan đến các sản phẩm đã lọc
+    related_sellers_ids = products.values_list('seller_id', flat=True).distinct()
+    sellers = SellerProfile.objects.filter(seller_id__in=related_sellers_ids)[:2]
     sellers_serialized = UserSerializer(sellers, many=True).data
 
     return Response({
         "products": products_serialized,
-        "top_sellers": sellers_serialized,
-        "total_count": len(products_serialized)  # Thêm số lượng sản phẩm vào response
+        "top_sellers": sellers_serialized
     }, status=200)
 
 @api_view(['GET'])
@@ -447,15 +442,15 @@ def search_products(request):
     # Tìm kiếm theo category trước
     categories = Category.objects.filter(category_name__icontains=search_term)
     if categories.exists():
-        products = Product.objects.filter(subcategory__category__in=categories).prefetch_related('productimage_set')
+        products = Product.objects.filter(subcategory__category__in=categories).prefetch_related('images')
     else:
         # Nếu không tìm thấy category, tìm kiếm theo subcategory
         subcategories = Subcategory.objects.filter(subcategory_name__icontains=search_term)
         if subcategories.exists():
-            products = Product.objects.filter(subcategory__in=subcategories).prefetch_related('productimage_set')
+            products = Product.objects.filter(subcategory__in=subcategories).prefetch_related('images')
         else:
             # Nếu không tìm thấy subcategory, tìm kiếm theo tên sản phẩm
-            products = Product.objects.filter(name__icontains=search_term).prefetch_related('productimage_set')
+            products = Product.objects.filter(name__icontains=search_term).prefetch_related('images')
 
     # Nếu không tìm thấy kết quả nào, trả về thông báo
     if not products.exists():
@@ -478,8 +473,10 @@ def search_products(request):
             #     .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
             #     .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
+            "rating": product.rating,  # Thêm rating
+            "sales_strategy": product.sales_strategy,  # Thêm sales_strategy
             "images": [
-                image.file for image in product.productimage_set.all()
+                image.file for image in product.images.all()
             ]
         }
         for product in products

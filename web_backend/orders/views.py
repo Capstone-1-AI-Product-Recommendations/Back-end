@@ -3,10 +3,90 @@ from rest_framework.decorators import api_view
 from rest_framework import status
 from web_backend.models import Order, OrderItem, CartItem, User #, ShippingAddress
 from .serializers import OrderSerializer, ShippingAddressSerializer
+from web_backend.models import PurchasedProduct, Order, OrderItem, CartItem, User , ShippingAddress
+from .serializers import OrderSerializer, ShippingAddressSerializer
+import json
+from django.utils import timezone
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 def create_order(request, user_id):
-    # Lấy thông tin người dùng
+    try:
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy cart_item_ids và chuyển chuỗi JSON thành danh sách
+    cart_item_ids_str = request.data.get('cart_item_ids', '[]')  # Mặc định là chuỗi rỗng nếu không có
+    try:
+        cart_item_ids = json.loads(cart_item_ids_str)  # Chuyển chuỗi JSON thành danh sách
+    except json.JSONDecodeError:
+        return Response({"error": "Dữ liệu cart_item_ids không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not cart_item_ids:
+        return Response({"error": "Cần phải chọn ít nhất một sản phẩm."}, status=status.HTTP_400_BAD_REQUEST)
+
+    cart_items = CartItem.objects.filter(cart_item_id__in=cart_item_ids, cart__user=user)
+    if not cart_items.exists():
+        return Response({"error": "Không tìm thấy sản phẩm trong giỏ hàng."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Tiến hành tạo đơn hàng
+    order = Order.objects.create(
+        user=user,
+        total=0,
+        status='Pending',
+    )
+
+    total_amount = 0
+    for item in cart_items:
+        product = item.product
+        quantity = item.quantity
+        price = product.price
+        total_amount += price * quantity
+
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=quantity,
+            price=price * quantity,
+        )
+        # Lưu thông tin xuống PurchasedProduct
+        PurchasedProduct.objects.create(
+            user=user,
+            product=product,
+            shop=product.shop,  # Giả định mỗi sản phẩm liên kết với shop qua `product.shop`
+            order=order,
+            quantity=quantity,
+            price_at_purchase=price,
+            status='pending',  # Mặc định trạng thái ban đầu là `completed`
+            purchased_at=timezone.now(),  # Ngày giờ mua
+        )
+
+    order.total = total_amount
+    order.save()
+    cart_items.delete()
+
+    # Xử lý thông tin nhận hàng
+    recipient_name = request.data.get('recipient_name', user.full_name) or user.full_name
+    recipient_phone = request.data.get('recipient_phone', user.phone_number) or user.phone_number
+    recipient_address = request.data.get('recipient_address', user.address) or user.address
+
+    # Cập nhật hoặc tạo mới địa chỉ nhận hàng
+    shipping_address, created = ShippingAddress.objects.update_or_create(
+        user=user,
+        defaults={
+            'recipient_name': recipient_name,
+            'recipient_phone': recipient_phone,
+            'recipient_address': recipient_address,
+        }
+    )
+
+    # Trả về thông tin đơn hàng
+    order_serializer = OrderSerializer(order)
+    return Response(order_serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'PUT'])
+def update_shipping_address(request, user_id):
     try:
         user = User.objects.get(user_id=user_id)
     except User.DoesNotExist:
@@ -23,7 +103,6 @@ def create_order(request, user_id):
                 recipient_phone=user.phone_number,
                 recipient_address=user.address
             )
-
         # Sử dụng serializer để trả về thông tin nhận hàng
         serializer = ShippingAddressSerializer(shipping_address)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -87,22 +166,38 @@ def create_order(request, user_id):
         order_serializer = OrderSerializer(order)
         return Response(order_serializer.data, status=status.HTTP_201_CREATED)
     
-@api_view(['PUT'])
+@api_view(['GET', 'PUT'])
 def update_shipping_address(request, user_id):
-    # Lấy thông tin người dùng
-    user = User.objects.get(user_id=user_id)
-    # Lấy thông tin nhận hàng của người dùng
-    shipping_address = ShippingAddress.objects.filter(user=user).first()
-    if not shipping_address:
-        return Response({"error": "Thông tin nhận hàng không tồn tại."}, status=status.HTTP_400_BAD_REQUEST)
-    # Cập nhật thông tin nhận hàng
-    shipping_address.recipient_name = request.data.get('recipient_name', shipping_address.recipient_name)
-    shipping_address.recipient_phone = request.data.get('recipient_phone', shipping_address.recipient_phone)
-    shipping_address.recipient_address = request.data.get('recipient_address', shipping_address.recipient_address)
-    # Lưu thông tin nhận hàng đã cập nhật
-    shipping_address.save()
-    return Response({"message": "Thông tin nhận hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
+    try:
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+    if request.method == 'GET':
+        try:
+            # Lấy thông tin từ bảng ShippingAddress
+            shipping_address = user.shipping_address
+        except ShippingAddress.DoesNotExist:
+            # Nếu không có, tạo một ShippingAddress tạm thời từ thông tin User
+            shipping_address = ShippingAddress(
+                recipient_name=user.full_name,
+                recipient_phone=user.phone_number,
+                recipient_address=user.address
+            )
+        serializer = ShippingAddressSerializer(shipping_address)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        # Cập nhật hoặc tạo thông tin nhận hàng
+        shipping_address, created = ShippingAddress.objects.get_or_create(user=user)
+        shipping_address.recipient_name = request.data.get('recipient_name', shipping_address.recipient_name or user.full_name)
+        shipping_address.recipient_phone = request.data.get('recipient_phone', shipping_address.recipient_phone or user.phone_number)
+        shipping_address.recipient_address = request.data.get('recipient_address', shipping_address.recipient_address or user.address)
+        shipping_address.save()
+
+        return Response({"message": "Thông tin nhận hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
+
+    
 @api_view(['DELETE'])
 def cancel_order_item(request, user_id, order_item_id):
     try:

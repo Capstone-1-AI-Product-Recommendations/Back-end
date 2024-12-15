@@ -7,7 +7,22 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.db.models import Avg
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
+# class Ad(models.Model):
+#     ad_id = models.AutoField(primary_key=True)
+#     title = models.CharField(max_length=255)
+#     description = models.TextField(blank=True, null=True)
+#     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
+#     start_date = models.DateField()
+#     end_date = models.DateField()
+#     created_at = models.DateTimeField(blank=True, null=True)
+#     updated_at = models.DateTimeField(blank=True, null=True)
+
+#     class Meta:
+#         managed = False
+#         db_table = 'ad'
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -16,8 +31,8 @@ class Ad(models.Model):
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -25,8 +40,8 @@ class Ad(models.Model):
 
 class Cart(models.Model):
     cart_id = models.AutoField(primary_key=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
@@ -43,7 +58,7 @@ class CartItem(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'cart_item'
+        db_table = 'cart_item'   
 
 
 class Category(models.Model):
@@ -54,6 +69,7 @@ class Category(models.Model):
     class Meta:
         managed = False
         db_table = 'category'
+        
 
 class Subcategory(models.Model):
     subcategory_id = models.AutoField(primary_key=True)
@@ -64,13 +80,13 @@ class Subcategory(models.Model):
     class Meta:
         managed = False
         db_table = 'subcategory'
-
+        
 
 class Comment(models.Model):
     comment_id = models.AutoField(primary_key=True)
     comment = models.TextField()
     rating = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     product = models.ForeignKey('Product', models.DO_NOTHING)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
@@ -94,7 +110,7 @@ class Notification(models.Model):
     notification_id = models.AutoField(primary_key=True)
     message = models.TextField()
     is_read = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True,blank=True, null=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
     class Meta:
@@ -106,15 +122,14 @@ class Order(models.Model):
     order_id = models.AutoField(primary_key=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add= True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add= True, blank=True, null=True)
     user = models.ForeignKey('User', models.DO_NOTHING)
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         managed = False
         db_table = 'order'
-
 
 class OrderItem(models.Model):
     order_item_id = models.AutoField(primary_key=True)
@@ -134,8 +149,8 @@ class Payment(models.Model):
     status = models.CharField(max_length=20)
     payment_method = models.CharField(max_length=50)
     transaction_id = models.CharField(unique=True, max_length=100, blank=True, null=True)
-    created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
     order = models.ForeignKey('Order', models.DO_NOTHING)
     user = models.ForeignKey('User', models.DO_NOTHING)
 
@@ -143,13 +158,14 @@ class Payment(models.Model):
         managed = False
         db_table = 'payment'
 
+
 class Product(models.Model):
     product_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=15, decimal_places=2)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     quantity = models.IntegerField()
     subcategory = models.ForeignKey('Subcategory', on_delete=models.SET_NULL, blank=True, null=True)
     is_featured = models.BooleanField(default=False)
@@ -182,9 +198,6 @@ class Product(models.Model):
         average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
         return round(average_rating, 1) if average_rating else 0
 
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
-
 @receiver(pre_save, sender=Product)
 def update_is_featured(sender, instance, **kwargs):
     # Kiểm tra các tiêu chí: có giá khuyến mãi, thuộc sự kiện, hoặc được quảng cáo
@@ -202,16 +215,14 @@ class ProductAd(models.Model):
         managed = False
         db_table = 'product_ad'
 
-
 class ProductImage(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey('Product', models.DO_NOTHING)
+    product = models.ForeignKey('Product', on_delete=models.CASCADE,related_name='images')
 
     class Meta:
         managed = False
         db_table = 'product_image'
-
 
 class ProductRecommendation(models.Model):
     recommendation_id = models.AutoField(primary_key=True)
@@ -225,18 +236,16 @@ class ProductRecommendation(models.Model):
     class Meta:
         managed = False
         db_table = 'product_recommendation'
-
-
+    
 class ProductVideo(models.Model):
     id = models.BigAutoField(primary_key=True)
     file = models.CharField(max_length=200)
-    product = models.ForeignKey('Product', models.DO_NOTHING)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE,related_name='videos')
 
     class Meta:
         managed = False
         db_table = 'product_video'
-
-
+        
 class Role(models.Model):
     role_id = models.AutoField(primary_key=True)
     role_name = models.CharField(unique=True, max_length=50)
@@ -266,7 +275,6 @@ class Shop(models.Model):
         managed = False
         db_table = 'shop'
 
-
 class ShopInfo(models.Model):
     shop_info_id = models.AutoField(primary_key=True)
     shop = models.ForeignKey(Shop, models.DO_NOTHING, blank=True, null=True)
@@ -279,7 +287,6 @@ class ShopInfo(models.Model):
         managed = False
         db_table = 'shop_info'
 
-
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(unique=True, max_length=50)
@@ -290,8 +297,8 @@ class User(models.Model):
     phone_number = models.CharField(max_length=30, blank=True, null=True)
     reset_token = models.CharField(max_length=50, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
     role = models.ForeignKey(Role, models.DO_NOTHING, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
@@ -299,7 +306,6 @@ class User(models.Model):
     class Meta:
         managed = False
         db_table = 'user'
-
 
 class UserBankAccount(models.Model):
     bank_account_id = models.AutoField(primary_key=True)
@@ -313,7 +319,6 @@ class UserBankAccount(models.Model):
         managed = False
         db_table = 'user_bank_account'
 
-
 class UserBrowsingBehavior(models.Model):
     behavior_id = models.AutoField(primary_key=True)
     activity_type = models.CharField(max_length=50)
@@ -324,7 +329,8 @@ class UserBrowsingBehavior(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'user_browsing_behavior'
+        db_table = 'user_browsing_behavior'       
+
 
 class ShippingAddress(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shipping_address')
@@ -335,4 +341,24 @@ class ShippingAddress(models.Model):
     class Meta:
         managed = False
         db_table = 'shipping_address'
-        
+
+class PurchasedProduct(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    purchased_product_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchased_products')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='purchases')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='sold_products')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='purchased_products')  # Liên kết với đơn hàng
+    quantity = models.IntegerField()
+    price_at_purchase = models.DecimalField(max_digits=15, decimal_places=2)  # Lưu giá sản phẩm tại thời điểm mua
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    purchased_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'purchased_product'

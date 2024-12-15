@@ -28,5 +28,6 @@ admin.site.register(CartItem)
 admin.site.register(Cart)
 admin.site.register(Ad)
 admin.site.register(DjangoMigrations)
+admin.site.register(PurchasedProduct)
 
 

@@ -41,7 +41,10 @@ urlpatterns = [
 
     # Stats
     path('stats/sales/<str:period>/', views.get_sales_data, name='get-sales-data'),  # API Tổng doanh số, lợi nhuận, doanh thu
+
     path('admin_dashboard/stats/new-customers/<str:period>/', views.get_new_customers_by_period, name='new_customers_by_period'),  # API Khách hàng mới (theo thời gian)
+
+    path('stats/new-customers/<str:period>/', views.get_new_customers, name='get-new-customers-stats'),  # API Khách hàng mới (theo thời gian)
 
     # Admin Info
     path('admin/info/', views.get_admin_info, name='get-admin-info'),  # API lấy thông tin admin

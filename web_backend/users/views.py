@@ -114,6 +114,7 @@ def login_view(request):
                     token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
                     user_serializer = LoginUserSerializer(user) 
                     response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)
+                    response = Response({'message': 'Login successful'}, status=status.HTTP_200_OK)
                     response.set_cookie(
                         'user_token',  # Cookie name
                         token,  # Token value

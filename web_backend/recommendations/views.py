@@ -13,7 +13,6 @@ from django.db.models import Avg, Count, Sum
 
 # Tải các mô hình đã huấn luyện
 svd = joblib.load('recommendations/models/svd_model.pkl')
-# tfidf = joblib.load('recommendations/models/tfidf_model.pkl')
 cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
 user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
 user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')

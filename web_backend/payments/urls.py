@@ -1,12 +1,12 @@
 from django.urls import path
-from .views import cod_payment, zalopay_payment, zalopay_callback
+
+from .views import *
 
 urlpatterns = [
     # Payment routes
-    path('payments/cod/<int:order_id>/', cod_payment, name='cod_payment'),
-    path('payments/zalopay/<int:order_id>/', zalopay_payment, name='zalopay_payment'),
-    # Callback from ZaloPay (order_id may not be necessary for callback)
-    #path('payments/zalopay_callback/', payment_callback, name='payment_callback'),
-    path('payments/zalopay_callback/<int:order_id>/', zalopay_callback, name='zalopay_callback'),
-
+    path('payments/cod/<int:order_id>/', payment_cod, name='cod_payment'),
+    path('payos_payment/<int:user_id>/<int:order_id>/', payos, name='payos'),
+    path('payment/cod/<int:user_id>/<int:order_id>/', payment_cod, name='payment_cod'),
+    path('admin/order/<int:admin_id>/<int:seller_id>/<int:order_id>/', process_transfer, name='process_transfer'),
+    path('vnpay_payment/<int:user_id>/<str:order_id>/', vnpay, name='vnpay'),
 ]

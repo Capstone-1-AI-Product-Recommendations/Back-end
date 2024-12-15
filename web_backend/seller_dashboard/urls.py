@@ -4,8 +4,7 @@ from .views import delete_shop, update_shop, get_shop_info, get_orders, create_s
 from . import views
 
 urlpatterns = [
-    # Quản lý đơn hàng
-    path('seller/orders/<int:seller_id>/', views.get_orders, name='get_orders'),
+    # Quản lý đơn hàng    
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', views.get_order_details, name='get_order_details'),
 
     # Quản lý quảng cáo
@@ -15,6 +14,7 @@ urlpatterns = [
 #     # Quản lý hồ sơ seller
 #     path('seller/profile/<int:seller_id>/', views.get_seller_profile, name='get_seller_profile'),
 #     path('seller/update_profile/<int:seller_id>/', views.update_seller_profile, name='update_seller_profile'),
+
 
 
     path('seller/orders/<int:seller_id>/', get_orders, name='get_orders'),
@@ -27,11 +27,7 @@ urlpatterns = [
 
     # Thông báo và phản hồi của người dùng
     path('seller/notifications/<int:seller_id>/', views.get_notifications, name='get_notifications'),
-    path('seller/comments/<int:seller_id>/', views.get_comments, name='get_comments'),
-
-    # Thông báo và phản hồi của người dùng theo sản phẩm
-    path('seller/<int:seller_id>/comments/<int:product_id>/', views.get_comments_for_product,
-         name='get_comments_for_product'),
+    path('seller/comments/<int:seller_id>/', views.get_comments, name='get_comments'),    
 
     path('seller/<int:seller_id>/comments_product/<int:product_id>/', get_comments_for_product, name='get_comments_for_product'),
 
@@ -41,18 +37,15 @@ urlpatterns = [
     path('seller/ad_performance/<int:seller_id>/', views.ad_performance, name='ad_performance'),
 
     # Báo cáo và thống kê theo sản phẩm
-    path('seller/<int:seller_id>/sales_report/<int:product_id>/', views.sales_report_for_product,
-         name='sales_report_for_product'),
-    path('seller/<int:seller_id>/ad_performance/<int:product_id>/', views.ad_performance_for_product,
-         name='ad_performance_for_product'),
+
+    path('seller/<int:seller_id>/sales_report/<int:product_id>/', sales_report_for_product, name='sales_report_for_product'),
+    path('seller/<int:seller_id>/ad_performance/<int:product_id>/', ad_performance_for_product, name='ad_performance_for_product'),
 
     # Quản lý khuyến nghị sản phẩm
-    path('seller/product_recommendations/<int:seller_id>/', views.get_product_recommendations,
-         name='get_product_recommendations'),
+    path('seller/product_recommendations/<int:seller_id>/', get_product_recommendations, name='get_product_recommendations'),
 
     # Khuyến nghị sản phẩm theo sản phẩm cụ thể
-    path('seller/<int:seller_id>/product_recommendations/<int:product_id>/',
-         views.get_product_recommendations_for_product, name='get_product_recommendations_for_product'),
+    path('seller/<int:seller_id>/product_recommendations/<int:product_id>/', get_product_recommendations_for_product, name='get_product_recommendations_for_product'),
 
     # Quảng cáo
     path('ads/', views.get_ads, name='get_ads'),  # API lấy danh sách quảng cáo

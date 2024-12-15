@@ -304,3 +304,4 @@ VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'  # URL 
 VNPAY_RETURN_URL = 'http://example.com/payment_return'
 
 JWT_SECRET_KEY = '0384e4e57b547bf01073fd843bbdd50895215015b9e1620ed26608b3bc41bd25'
+
