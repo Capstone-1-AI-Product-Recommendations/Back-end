@@ -188,8 +188,8 @@ def get_trending_products(request):
             ).strip(),
             "price": product.price,
             "rating": product.computed_rating,
-            "total_sales": product.total_sales or 0,
-            "trending_score": round(product.trending_score, 2),
+            "sales_strategy": product.sales_strategy,
+            "trending_score": round(product.trending_score if product.trending_score is not None else 0, 2),
             "images": [image.file for image in product.productimage_set.all()]
         }
         for product in trending_products
@@ -219,7 +219,7 @@ def get_random_products(request):
             ).strip(),
             "price": product.price,
             "rating": product.computed_rating,
-            "total_sales": product.orderitem_set.aggregate(total=Sum('quantity')).get('total', 0),
+            "sales_strategy": product.sales_strategy,
             "images": [image.file for image in product.productimage_set.all()]
         }
         for product in random_products
