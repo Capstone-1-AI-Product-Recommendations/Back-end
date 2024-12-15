@@ -290,7 +290,7 @@ class UserBrowsingBehavior(models.Model):
     timestamp = models.DateTimeField(blank=True, null=True)
     product = models.ForeignKey(Product, models.DO_NOTHING)
     user = models.ForeignKey(User, models.DO_NOTHING)
-
+    content = models.TextField(null=True, blank=True)
     class Meta:
         managed = False
         db_table = 'user_browsing_behavior'

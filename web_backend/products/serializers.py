@@ -27,10 +27,10 @@ class SubcategorySerializer(serializers.ModelSerializer):
 
 
 # Serializer for ProductRecommendation model
-class ProductRecommendationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProductRecommendation
-        fields = ['user', 'description']
+# class ProductRecommendationSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ProductRecommendation
+#         fields = ['user', 'description']
 
 
 # Serializer for ProductAd model
@@ -101,9 +101,11 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['user', 'comment', 'rating', 'created_at']
 
 class ProductRecommendationSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.category_name', read_only=True)
+
     class Meta:
         model = ProductRecommendation
-        fields = ['user', 'description']
+        fields = ['recommendation_id', 'session_id', 'description', 'recommended_at', 'category_name', 'product']
 class ProductAdSerializer(serializers.ModelSerializer):
     ad_title = serializers.CharField(source='ad.title', read_only=True)
     class Meta:
@@ -154,7 +156,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'product_id', 'name', 'price', 'category', 'subcategory', 'description',
             'seller', 'images', 'videos', 'quantity', 'recommendations', 'ads', 'comments',
-            'color', 'brand', 'stock_status'
+            'color', 'brand'
         ]
 class CRUDProductSerializer(serializers.ModelSerializer):
     category = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=False)

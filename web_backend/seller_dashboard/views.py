@@ -113,7 +113,7 @@ def create_shop(request, seller_id):
     # Thêm seller vào validated_data trước khi tạo sản phẩm
     mutable_data = request.data.copy()
     mutable_data['seller'] = seller_id  # Thêm seller vào dữ liệu
-
+    
     # Sử dụng serializer với dữ liệu mới
     serializer = ShopSerializer(data=mutable_data)
 

@@ -235,6 +235,12 @@ def reset_password(request):
 
     try:
         user = User.objects.get(email=email, username=username)
+        
+        # if old_password == user.password:
+        #     user.password = make_password(new_password)  
+        #     user.save()
+        #     return Response({"message": "Password reset successfully."}, status=status.HTTP_200_OK)
+
         if check_password(old_password, user.password):  # Validate old password
             user.password = make_password(new_password)  # Hash and save the new password
             user.save()

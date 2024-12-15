@@ -371,8 +371,11 @@ def filter_page(request):
     products_serialized = ProductSerializer(products, many=True).data
 
     # Lọc người bán liên quan đến các sản phẩm đã lọc
-    related_sellers_ids = products.values_list('seller_id', flat=True).distinct()
-    sellers = SellerProfile.objects.filter(seller_id__in=related_sellers_ids)[:2]
+    related_shop_ids = products.values_list('shop_id', flat=True).distinct()
+    sellers = User.objects.filter(
+        shop__shop_id__in=related_shop_ids,
+        role__role_name='Seller'
+    )[:2]
     sellers_serialized = UserSerializer(sellers, many=True).data
 
     return Response({
@@ -380,3 +383,62 @@ def filter_page(request):
         "top_sellers": sellers_serialized
     }, status=200)
 
+@api_view(['GET'])
+def search_products(request):
+    print("Đã vào được ", request.GET)
+    search_term = request.GET.get('search_term', '').strip()
+    
+    if not search_term:
+        return Response(
+            {"error": "Please provide a search term"}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Tìm kiếm theo category trước
+    categories = Category.objects.filter(category_name__icontains=search_term)
+    if categories.exists():
+        products = Product.objects.filter(subcategory__category__in=categories).prefetch_related('images')
+    else:
+        # Nếu không tìm thấy category, tìm kiếm theo subcategory
+        subcategories = Subcategory.objects.filter(subcategory_name__icontains=search_term)
+        if subcategories.exists():
+            products = Product.objects.filter(subcategory__in=subcategories).prefetch_related('images')
+        else:
+            # Nếu không tìm thấy subcategory, tìm kiếm theo tên sản phẩm
+            products = Product.objects.filter(name__icontains=search_term).prefetch_related('images')
+
+    # Nếu không tìm thấy kết quả nào, trả về thông báo
+    if not products.exists():
+        return Response(
+            {
+                "message": "No products found",
+                "products": [],
+                "total_count": 0
+            }, 
+            status=status.HTTP_200_OK
+        )
+
+    # Serialize kết quả
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": product.description
+                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
+                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
+                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
+            "price": product.price,
+            # "rating": product.rating,  # Thêm rating
+            # "sales_strategy": product.sales_strategy,  # Thêm sales_strategy
+            "images": [
+                image.file for image in product.images.all()
+            ]
+        }
+        for product in products
+    ]
+
+    return Response({
+        "message": "Products found successfully",
+        "products": serialized_data,
+        "total_count": len(serialized_data)
+    }, status=status.HTTP_200_OK)
