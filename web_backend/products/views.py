@@ -150,13 +150,13 @@ def get_featured_products(request):
             "product_id": product.product_id,
             "name": product.name,
             "description": re.sub(
-                r'(\n\s*)+', '\n',  # Thay thế nhiều ký tự xuống dòng liên tiếp bằng 1 '\n'
-                str(product.description).replace('__NEWLINE__', '\n').replace('\\n', '\n')
-            ).strip(),  # Loại bỏ khoảng trắng đầu/cuối
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
             "price": product.price,
-            "images": [
-                image.file for image in product.productimage_set.all()
-            ]
+            "rating": product.computed_rating,
+            "sales_strategy": product.sales_strategy,
+            "images": [image.file for image in product.productimage_set.all()]
         }
         for product in featured_products
     ]
@@ -182,15 +182,15 @@ def get_trending_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description
-                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
+            "description": re.sub(
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
             "price": product.price,
-            "trending_score": product.trending_score,
-            "images": [
-                image.file for image in product.productimage_set.all()
-            ]
+            "rating": product.computed_rating,
+            "total_sales": product.total_sales or 0,
+            "trending_score": round(product.trending_score, 2),
+            "images": [image.file for image in product.productimage_set.all()]
         }
         for product in trending_products
     ]
@@ -200,6 +200,9 @@ def get_trending_products(request):
 @api_view(['GET'])
 def get_random_products(request):
     product_count = Product.objects.count()
+    if product_count == 0:
+        return Response([])  # Trả về danh sách rỗng nếu không có sản phẩm
+
     random_ids = random.sample(
         list(Product.objects.values_list('product_id', flat=True)),
         min(28, product_count)
@@ -210,14 +213,14 @@ def get_random_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": product.description
-                .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-                .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-                .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
+            "description": re.sub(
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
             "price": product.price,
-            "images": [
-                image.file for image in product.productimage_set.all()
-            ]
+            "rating": product.computed_rating,
+            "total_sales": product.orderitem_set.aggregate(total=Sum('quantity')).get('total', 0),
+            "images": [image.file for image in product.productimage_set.all()]
         }
         for product in random_products
     ]

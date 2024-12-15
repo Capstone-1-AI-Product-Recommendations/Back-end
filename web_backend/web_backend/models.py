@@ -174,13 +174,39 @@ class Product(models.Model):
     @property
     def stock_status(self):
         return 'in_stock' if self.quantity > 0 else 'out_of_stock'
+    def update_computed_rating(self):
+        """
+        Tính toán và cập nhật trường `rating` dựa trên rating trung bình từ các comment.
+        """
+        average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
+        self.rating = round(average_rating, 1) if average_rating else 0
+        self.save()
+
     @property
     def computed_rating(self):
         """
-        Tính rating trung bình từ các comment.
+        Lấy giá trị rating hiện tại (trong trường hợp cần sử dụng ngay).
         """
-        average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
-        return round(average_rating, 1) if average_rating else 0
+        if self.rating is None:  # Nếu rating chưa được tính
+            self.update_computed_rating()
+        return self.rating
+    @property
+    def update_sales_strategy(self):
+        # Tính tổng số lượng bán dựa trên các OrderItem liên quan
+        total_sales = OrderItem.objects.filter(product=self).aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        # Xác định chiến lược dựa trên các ngưỡng số lượng bán ra
+        if total_sales >= 100:
+            self.sales_strategy = 3  # Bán chạy nhất
+        elif total_sales >= 50:
+            self.sales_strategy = 2  # Phổ biến
+        elif total_sales >= 10:
+            self.sales_strategy = 1  # Trung bình
+        else:
+            self.sales_strategy = 0  # Bán ít
+
+        # Lưu lại chiến lược đã cập nhật
+        self.save()
 
 from django.db.models.signals import pre_save
 from django.dispatch import receiver

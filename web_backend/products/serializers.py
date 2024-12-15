@@ -78,24 +78,36 @@ class ProductVideoSerializer(serializers.ModelSerializer):
         fields = ['id', 'file']
 
 
-# Serializer for Product
 class ProductSerializer(serializers.ModelSerializer):
+    # Quan hệ khóa ngoại
     category = CategorySerializer(read_only=True)
     subcategory = SubcategorySerializer(read_only=True)
-    seller_name = serializers.CharField(source='seller.store_name', read_only=True)
+
+    # Thông tin seller
+    shop_name = serializers.CharField(source='shop.name', read_only=True)  # Thay 'seller.store_name' bằng 'shop.name'
+
+    # Các liên kết nhiều-đến-một
     images = ProductImageSerializer(many=True, read_only=True)
     videos = ProductVideoSerializer(many=True, read_only=True)
     comments = CommentSerializer(source='comment_set', many=True, read_only=True)
     ads = ProductAdSerializer(source='productad_set', many=True, read_only=True)
     recommendations = ProductRecommendationSerializer(source='productrecommendation_set', many=True, read_only=True)
-    computed_rating = serializers.FloatField(read_only=True)
+
+    # Các trường tính toán
+    rating = serializers.FloatField(read_only=True)  # Thay đổi từ computed_rating thành rating
+
+    # Thêm trường stock_status
+    stock_status = serializers.CharField(read_only=True)  # Trường @property trong model
 
     class Meta:
         model = Product
         fields = [
-            'product_id', 'name', 'description', 'price', 'quantity', 'color', 'brand', 'stock_status',
-            'category', 'subcategory', 'seller_name', 'images', 'videos', 'comments', 'ads', 'recommendations', 'computed_rating'
+            'product_id', 'name', 'description', 'price', 'quantity', 'color', 'brand',
+            'stock_status', 'category', 'subcategory', 'shop_name',
+            'images', 'videos', 'comments', 'ads', 'recommendations',
+            'rating', 'sales_strategy'
         ]
+
 
 # Serializer for CRUD Product operations
 class CRUDProductSerializer(serializers.ModelSerializer):
