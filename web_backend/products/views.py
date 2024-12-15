@@ -24,12 +24,15 @@ from recommendations.views import get_recommended_products
 # API to retrieve product details by product ID
 @api_view(['GET'])
 def product_detail(request, user_id, product_id):
+    print("user_id",user_id)
     try:
-        product = Product.objects.select_related('category', 'seller') \
-                                  .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set') \
-                                  .get(product_id=product_id)        
+        # Sử dụng select_related cho 'subcategory' và 'shop__user', và prefetch_related cho ảnh và video
+        product = Product.objects.select_related('subcategory', 'shop__user') \
+                                  .prefetch_related('productrecommendation_set', 'productad_set__ad', 'comment_set', 'images', 'videos') \
+                                  .get(product_id=product_id)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+    
     serializer = DetailProductSerializer(product)
     return Response(serializer.data)
 
@@ -429,4 +432,62 @@ def filter_page(request):
         "top_sellers": sellers_serialized,
         "total_count": len(products_serialized)  # Thêm số lượng sản phẩm vào response
     }, status=200)
+
+@api_view(['GET'])
+def search_products(request):
+    print("Đã vào được ", request.GET)
+    search_term = request.GET.get('search_term', '').strip()
+    
+    if not search_term:
+        return Response(
+            {"error": "Please provide a search term"}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Tìm kiếm theo category trước
+    categories = Category.objects.filter(category_name__icontains=search_term)
+    if categories.exists():
+        products = Product.objects.filter(subcategory__category__in=categories).prefetch_related('productimage_set')
+    else:
+        # Nếu không tìm thấy category, tìm kiếm theo subcategory
+        subcategories = Subcategory.objects.filter(subcategory_name__icontains=search_term)
+        if subcategories.exists():
+            products = Product.objects.filter(subcategory__in=subcategories).prefetch_related('productimage_set')
+        else:
+            # Nếu không tìm thấy subcategory, tìm kiếm theo tên sản phẩm
+            products = Product.objects.filter(name__icontains=search_term).prefetch_related('productimage_set')
+
+    # Nếu không tìm thấy kết quả nào, trả về thông báo
+    if not products.exists():
+        return Response(
+            {
+                "message": "No products found",
+                "products": [],
+                "total_count": 0
+            }, 
+            status=status.HTTP_200_OK
+        )
+
+    # Serialize kết quả
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            # "description": product.description
+            #     .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
+            #     .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
+            #     .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
+            "price": product.price,
+            "images": [
+                image.file for image in product.productimage_set.all()
+            ]
+        }
+        for product in products
+    ]
+
+    return Response({
+        "message": "Products found successfully",
+        "products": serialized_data,
+        "total_count": len(serialized_data)
+    }, status=status.HTTP_200_OK)
 

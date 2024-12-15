@@ -1,14 +1,10 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
-
-from .serializers import UserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer
-# from web_backend.models import Role, User, UserBankAccount
-from .serializers import RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer
+from .serializers import LoginUserSerializer, RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer, UserSerializer
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
-import jwt
 from django.conf import settings
 from django.core.mail import send_mail
 from django.views.decorators.csrf import csrf_exempt
@@ -19,21 +15,25 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from .decorators import admin_required
-# from .models import User, Role
 from web_backend.models import *
 import jwt
 from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
 from django.shortcuts import render
-from rest_framework.response import Response
+import re, random
+from django.forms import ValidationError 
+from django.contrib.sessions.models import Session
+from django.views.decorators.csrf import csrf_exempt
 # from rest_framework.views import APIView
 # from rest_framework.permissions import IsAdminUser
 # from .decorators import admin_required
 # from .models import User, Role
 # from .serializers import UserSerializer
 
+def validate_email_format(value):
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, value):
+        raise ValidationError("Invalid email format.") 
 
-# Register User
 @csrf_exempt
 @api_view(['POST'])
 def register(request):
@@ -59,7 +59,7 @@ def register(request):
             # Create user
             user = User.objects.create(**serializer.validated_data)
             if not user.role:
-                role_instance, created = Role.objects.get_or_create(role_name="User")
+                role_instance, created = Role.objects.get_or_create(role_name="user")
                 user.role = role_instance
                 user.save()
             # Generate verification token
@@ -112,7 +112,8 @@ def login_view(request):
                 user = User.objects.get(username=username)
                 if check_password(password, user.password):
                     token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
-                    response = Response({'message': 'Login successful', 'token': token}, status=status.HTTP_200_OK)
+                    user_serializer = LoginUserSerializer(user) 
+                    response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)
                     response.set_cookie(
                         'user_token',  # Cookie name
                         token,  # Token value
@@ -130,16 +131,12 @@ def login_view(request):
 
 # Logout User
 @api_view(['POST'])
-def logout_view(request):
-    if request.user.is_authenticated:
-        logout(request)
-        response = Response({"message": "User logged out successfully"}, status=status.HTTP_200_OK)
-        response.delete_cookie('user_token')  # Remove the cookie when logging out
-        return response
-    return Response({"error": "User not authenticated"}, status=status.HTTP_400_BAD_REQUEST)
+def logout_view(request, user_id):
+    response = Response({"message": f"User logged out successfully"}, status=status.HTTP_200_OK)
+    response.delete_cookie('user_token')  # Xóa cookie nếu tồn tại
+    return response
 
 # Google Sign-Up View to generate Google OAuth login URL
-
 @api_view(['POST'])
 def GoogleSignUpView(request):
     if request.method == 'POST':
@@ -217,13 +214,14 @@ def GoogleAuthCallback(request):
         user.role = role_instance
         user.save()
 
-        # Generate a JWT for the new user
-        token = jwt.encode({'user_id': user.user_id}, settings.SECRET_KEY, algorithm='HS256')
+        # Tạo mã JWT cho người dùng mới
+        token = jwt.encode({'user_id': user.user_id}, 'your_secret_key', algorithm='HS256')
 
-        return Response({
-            "message": "User signed up successfully via Google.",
-            "token": token
-        }, status=status.HTTP_201_CREATED)
+
+        # Generate a JWT for the new user
+        # token = jwt.encode({'user_id': user.user_id}, settings.SECRET_KEY, algorithm='HS256')
+
+        return Response({"message": "User signed up successfully via Google."}, status=status.HTTP_201_CREATED)
 
 # Reset Password View
 @api_view(['POST'])
@@ -251,40 +249,94 @@ def reset_password(request):
 # Forgot Password View
 @api_view(['POST'])
 def forgot_password(request):
-    email = request.data.get('email')  # Get email from request data
+    email = request.data.get('email')  # Lấy email từ yêu cầu    
     if not email:
-        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)    
+    # Kiểm tra định dạng email
     try:
-        user = User.objects.get(email=email)
-        new_password = get_random_string(8)  # Generate a random password
-        user.password = make_password(new_password)  # Hash the password before saving
-        user.save()
-
-        # Send the new password via email
+        validate_email_format(email)
+    except ValidationError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)    
+    # Lấy đúng email (chuyển thành chữ thường để tránh sai lệch)
+    email = email.lower().strip()    
+    try:
+        user = User.objects.get(email=email)        
+        # Tạo mã xác thực gồm 6 chữ số
+        verification_code = random.randint(100000, 999999)        
+        # Lưu mã xác thực vào cơ sở dữ liệu
+        # VerificationCode.objects.create(email=email, code=verification_code) 
+        request.session['verification_code'] = verification_code  
+        request.session.modified = True  # Đảm bảo session được lưu lại ngay   
+        # Gửi mã xác thực qua email
         send_mail(
-            subject="Your New Password",
-            message=f"Hi {user.username}, your new password is: {new_password}",
-            from_email="your_email@example.com",  # Change to your actual email
+            subject="Your Password Reset Verification Code",
+            message=f"Hi {user.username}, your verification code is: {verification_code}",
+            from_email="your_email@example.com",
             recipient_list=[email],
             fail_silently=False,
-        )
-        return Response(
-            {"message": "A new password has been sent to your email."},
-            status=status.HTTP_200_OK,
-        )
+        )        
+        return Response({"detail": "Verification code sent to your email.", "redirect_url": "http://127.0.0.1:8000/api/verify_reset_code/",}, status=status.HTTP_200_OK)    
+    except User.DoesNotExist:
+        return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['POST'])
+def verify_reset_code(request):
+    email = request.data.get('email')
+    verification_code = request.session.get('verification_code')
+    
+    if not email or not verification_code:
+        return Response({"error": "Email and verification code are required."}, status=status.HTTP_400_BAD_REQUEST)
+    # Kiểm tra mã xác thực từ session
+    session_code = request.session.get('verification_code')    
+    if not session_code:
+        return Response({"error": "Verification code has expired or is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if session_code != verification_code:
+        return Response({"error": "Invalid verification code. Please check the code or request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Lấy người dùng từ email
+        user = User.objects.get(email=email.lower().strip())
+        return Response({"detail": "Verification successful, you can now reset your password.", "redirect_url": "http://127.0.0.1:8000/api/new_password/"}, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response({"error": "User not found with the provided email."}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+def new_password(request):
+    email = request.data.get('email')
+    new_password = request.data.get('new_password')
+    confirm_password = request.data.get('confirm_password')
+    
+    if not email or not new_password or not confirm_password:
+        return Response({"error": "Email, new password, and confirm password are required."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Kiểm tra mật khẩu mới và mật khẩu xác nhận có khớp không
+    if new_password != confirm_password:
+        return Response({"error": "The new password and confirm password do not match."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Lấy người dùng từ email
+        user = User.objects.get(email=email.lower().strip())
+
+        # Đặt lại mật khẩu mới
+        user.password = make_password(new_password)
+        user.save()
+
+        # Xóa mã xác thực khỏi session sau khi đặt lại mật khẩu
+        if 'verification_code' in request.session:
+            del request.session['verification_code']
+        return Response({"detail": "Password reset successfully."}, status=status.HTTP_200_OK)
+    
     except User.DoesNotExist:
         return Response({"error": "User not found with the provided email."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# Update User Information View
+@csrf_exempt
 @api_view(['PUT'])
-def update_user(request):
-    user_id = request.data.get('user_id')  # Get `user_id` from request data
-    if not user_id:
-        return Response({"error": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
-
 def update_user(request, user_id):
 
     try:
@@ -314,7 +366,6 @@ def update_user(request, user_id):
             {
                 "message": "User information updated successfully.",
                 "updated_data": {
-                    "user_id": user.user_id,
                     "username": user.username,
                     "full_name": user.full_name,
                     "email": user.email,
@@ -328,96 +379,6 @@ def update_user(request, user_id):
         return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
-# Get User Bank Accounts View
-@api_view(['GET'])
-def get_user_bank_accounts(request, user_id):
-    try:
-        # Retrieve bank accounts for the user with the provided user_id
-        bank_accounts = UserBankAccount.objects.filter(user__user_id=user_id)
-        serializer = UserBankAccountSerializer(bank_accounts, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except UserBankAccount.DoesNotExist:
-        return Response({"error": "No bank accounts found for the user."}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-# Create User Bank Account View
-@api_view(['POST'])
-def create_user_bank_account(request, user_id):
-    try:
-        # Retrieve user by user_id
-        user = User.objects.get(user_id=user_id)
-
-        # Validate and create a bank account for the user
-        serializer = UserBankAccountSerializer(data=request.data, context={'user_id': user_id})
-        if serializer.is_valid():
-            serializer.save()  # Save the bank account information
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    except User.DoesNotExist:
-        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# Update User Bank Account View
-@api_view(['PUT'])
-def update_user_bank_account(request, bank_account_id):
-    try:
-        # Retrieve the bank account by ID
-        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
-    except UserBankAccount.DoesNotExist:
-        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Update the bank account information
-    serializer = UserBankAccountSerializer(bank_account, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()  # Save changes to the bank account
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# Delete User Bank Account View
-@api_view(['DELETE'])
-def delete_user_bank_account(request, bank_account_id):
-    try:
-        # Retrieve the bank account by ID
-        bank_account = UserBankAccount.objects.get(pk=bank_account_id)
-    except UserBankAccount.DoesNotExist:
-        return Response({'detail': 'Tài khoản ngân hàng không tồn tại.'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Delete the bank account
-    bank_account.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-class AdminUserRoleUpdateView(APIView):
-    permission_classes = [IsAdminUser]  # Only admin can access this view
-
-    def put(self, request, user_id):
-        try:
-            # Retrieve the user by user_id
-            user = User.objects.get(user_id=user_id)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Get role_id from the request data
-        role_id = request.data.get('role_id')
-        if not role_id:
-            return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Retrieve the role by role_id
-        try:
-            role = Role.objects.get(role_id=role_id)
-        except Role.DoesNotExist:
-            return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Update the user's role
-        user.role = role
-        user.save()
-        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'POST'])
 def user_bank_accounts_list_create(request, user_id):
@@ -495,3 +456,27 @@ def get_user_behavior(request, user_id):
 
 #         except User.DoesNotExist:
 #             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+# class AdminUserRoleUpdateView(APIView):
+#     permission_classes = [IsAdminUser]  # Only admin can access this view
+    # def put(self, request, user_id):
+    #     try:
+    #         # Retrieve the user by user_id
+    #         user = User.objects.get(user_id=user_id)
+    #     except User.DoesNotExist:
+    #         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    #     # Get role_id from the request data
+    #     role_id = request.data.get('role_id')
+    #     if not role_id:
+    #         return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    #     # Retrieve the role by role_id
+    #     try:
+    #         role = Role.objects.get(role_id=role_id)
+    #     except Role.DoesNotExist:
+    #         return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
+
+    #     # Update the user's role
+    #     user.role = role
+    #     user.save()
+    #     return Response(UserSerializer(user).data, status=status.HTTP_200_OK)

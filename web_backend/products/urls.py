@@ -3,8 +3,7 @@ from .views import (product_detail, create_product, update_product, delete_produ
     get_featured_products, get_trending_products, get_random_products,
     get_popular_categories, get_all_categories, get_latest_comments,
     filter_by_category, filter_by_price, filter_by_color, filter_by_brand,
-    filter_by_stock_status, filter_page
-)
+    filter_by_stock_status, filter_page, search_products)
 
 urlpatterns = [
     # Product-related URLs
@@ -44,6 +43,7 @@ urlpatterns = [
 
     # Search API
     path('search/', filter_page, name='search_products'),
+    path('search_products/', search_products, name='search_products'),
 
     # General filter page API (both search and filter)
     path('filter/', filter_page, name='filter_page'),

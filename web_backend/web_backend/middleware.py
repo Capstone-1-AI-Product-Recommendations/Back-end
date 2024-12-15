@@ -14,7 +14,13 @@ class UserActivityLoggingMiddleware:
 
         if request.method == 'GET' and 'products/detail' in request.path:
             # Lấy user_id và product_id từ URL
-            user_id = request.resolver_match.kwargs.get('user_id')
+            if request.resolver_match is not None:
+                user_id = request.resolver_match.kwargs.get('user_id')
+            else:
+                # Xử lý trường hợp không tìm thấy resolver_match
+                logger.error("No resolver match found for the request.")
+                return response  # Hoặc xử lý theo cách khác
+            print("user_id",user_id)
             product_id = request.resolver_match.kwargs.get('product_id')
 
             if user_id and product_id:

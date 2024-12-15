@@ -335,3 +335,4 @@ class ShippingAddress(models.Model):
     class Meta:
         managed = False
         db_table = 'shipping_address'
+        
