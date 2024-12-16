@@ -7,8 +7,6 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.db.models import Avg
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
 
 # class Ad(models.Model):
 #     ad_id = models.AutoField(primary_key=True)
@@ -80,7 +78,6 @@ class Subcategory(models.Model):
     class Meta:
         managed = False
         db_table = 'subcategory'
-        
 
 class Comment(models.Model):
     comment_id = models.AutoField(primary_key=True)
@@ -158,7 +155,6 @@ class Payment(models.Model):
         managed = False
         db_table = 'payment'
 
-
 class Product(models.Model):
     product_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
@@ -190,13 +186,42 @@ class Product(models.Model):
     @property
     def stock_status(self):
         return 'in_stock' if self.quantity > 0 else 'out_of_stock'
+    def update_computed_rating(self):
+        """
+        Tính toán và cập nhật trường `rating` dựa trên rating trung bình từ các comment.
+        """
+        average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
+        self.rating = round(average_rating, 1) if average_rating else 0
+        self.save()
+
     @property
     def computed_rating(self):
         """
-        Tính rating trung bình từ các comment.
+        Lấy giá trị rating hiện tại (trong trường hợp cần sử dụng ngay).
         """
-        average_rating = self.comment_set.aggregate(average=Avg('rating')).get('average')
-        return round(average_rating, 1) if average_rating else 0
+        if self.rating is None:  # Nếu rating chưa được tính
+            self.update_computed_rating()
+        return self.rating
+    @property
+    def update_sales_strategy(self):
+        # Tính tổng số lượng bán dựa trên các OrderItem liên quan
+        total_sales = OrderItem.objects.filter(product=self).aggregate(Sum('quantity'))['quantity__sum'] or 0
+
+        # Xác định chiến lược dựa trên các ngưỡng số lượng bán ra
+        if total_sales >= 100:
+            self.sales_strategy = 3  # Bán chạy nhất
+        elif total_sales >= 50:
+            self.sales_strategy = 2  # Phổ biến
+        elif total_sales >= 10:
+            self.sales_strategy = 1  # Trung bình
+        else:
+            self.sales_strategy = 0  # Bán ít
+
+        # Lưu lại chiến lược đã cập nhật
+        self.save()
+
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 @receiver(pre_save, sender=Product)
 def update_is_featured(sender, instance, **kwargs):
@@ -337,7 +362,8 @@ class ShippingAddress(models.Model):
     recipient_name = models.CharField(max_length=255)
     recipient_phone = models.CharField(max_length=20)
     recipient_address = models.TextField()
-
+    is_default = models.BooleanField(default=False)
+    
     class Meta:
         managed = False
         db_table = 'shipping_address'

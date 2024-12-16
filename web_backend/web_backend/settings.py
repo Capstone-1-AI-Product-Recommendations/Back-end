@@ -69,7 +69,8 @@ MIGRATION_MODULES = {
     # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
     # 'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
-    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
+    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'
+    # 'contenttypes': None,  # ngừng tạo bảng contenttypes
     # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
     'authtoken': None,  # Ngừng tạo bảng 'authtoken'
     'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
@@ -78,8 +79,10 @@ MIGRATION_MODULES = {
 }
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Add this at the top
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    'corsheaders.middleware.CorsMiddleware',  # Add this line before CommonMiddleware
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -87,9 +90,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     'allauth.account.middleware.AccountMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'web_backend.middleware.UserActivityLoggingMiddleware',
+    # 'web_backend.middleware.UserActivityLoggingMiddleware',
 ]
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Add your frontend URL here
@@ -172,13 +175,7 @@ CLOUDINARY_STORAGE = {
 }
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-# CLOUD_NAME = 'dkleeailh'
-# API_KEY = '171326873511271'
-# API_SECRET = 'aIwwnuXsnlhQYM0VsavcR_l56kQ'
 
-# REST_USE_JWT = True
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {  
     'default': {
@@ -194,8 +191,6 @@ DATABASES = {
         },
     }
 }
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -277,7 +272,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',  
     'http://127.0.0.1:8000/api/auth/registration/google/'
 ]
-CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = [
     'http://127.0.0.1:8000',  
@@ -303,5 +297,4 @@ VNPAY_HASH_SECRET_KEY = '2014BSCRHGFHJ3X8VKQG7BC9LP535QHZ'  # Secret Key
 VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'  # URL thanh toán VNPAY trong môi trường thử nghiệm
 VNPAY_RETURN_URL = 'http://example.com/payment_return'
 
-JWT_SECRET_KEY = '0384e4e57b547bf01073fd843bbdd50895215015b9e1620ed26608b3bc41bd25'
-
+JWT_SECRET_KEY = 'f50d4448422bcde0bdb483cb6f7a0d077f6372653452ad2d7e9ba6deb17373e6'

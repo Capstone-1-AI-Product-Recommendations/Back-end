@@ -15,7 +15,6 @@ from rest_framework import status
 from django.db import transaction
 
 # Serializer for Category
-# Serializer for Category model
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -45,17 +44,35 @@ class ProductRecommendationSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.category_name', read_only=True)
 
     class Meta:
+        model = Subcategory
+        fields = ['subcategory_id', 'subcategory_name', 'description', 'category_name']
+
+
+# Serializer for ProductRecommendation
+class ProductRecommendationSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.category_name', read_only=True)
+
+    class Meta:
         model = ProductRecommendation
         fields = ['recommendation_id', 'session_id', 'description', 'recommended_at', 'category_name', 'product']
 
-        
-# Serializer for ProductAd model
+
+# Serializer for ProductAd
 class ProductAdSerializer(serializers.ModelSerializer):
     ad_title = serializers.CharField(source='ad.title', read_only=True)
 
     class Meta:
         model = ProductAd
         fields = ['product_ad_id', 'ad_title']
+
+# # Serializer for Comment
+# class CommentSerializer(serializers.ModelSerializer):
+#     user_name = serializers.CharField(source='user.username', read_only=True)
+#     created_at = serializers.DateTimeField(read_only=True)
+
+#     class Meta:
+#         model = Comment
+#         fields = ['comment_id', 'user_name', 'comment', 'rating', 'created_at']
 
 # Serializer cho Comment
 class CommentSerializer(serializers.ModelSerializer):
@@ -127,7 +144,12 @@ class ProductSerializer(serializers.ModelSerializer):
 class DetailCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ['user', 'comment', 'rating', 'created_at']        
+        fields = ['user', 'comment', 'rating', 'created_at']
+
+class ProductRecommendationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductRecommendation
+        fields = ['user', 'description']
 class ProductAdSerializer(serializers.ModelSerializer):
     ad_title = serializers.CharField(source='ad.title', read_only=True)
     class Meta:

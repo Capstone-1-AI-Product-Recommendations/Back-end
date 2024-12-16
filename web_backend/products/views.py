@@ -19,16 +19,14 @@ import random
 from django.db.models import Q
 from django.urls import reverse
 from django.db.models import Sum, Avg, F
-
-from web_backend.utils import compress_and_upload_image, compress_and_upload_video
 from recommendations.views import get_recommended_products
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
 # API to retrieve product details by product ID
 @api_view(['GET'])
-def product_detail(request, user_id, product_id):
-    print("user_id",user_id)
+def product_detail(request, product_id):
+    print("user_id", product_id)
     try:
         # Sử dụng select_related cho 'subcategory' và 'shop__user', và prefetch_related cho ảnh và video
         product = Product.objects.select_related('subcategory', 'shop__user') \
@@ -37,8 +35,27 @@ def product_detail(request, user_id, product_id):
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
     
+    # Xử lý description
+    description = (
+        str(product.description or "")
+        .replace("__NEWLINE__", "\n")
+        .replace("\\n", "\n")
+        .strip()
+    )
+
+
+
+    
+    # Serialize product data
     serializer = DetailProductSerializer(product)
-    return Response(serializer.data)
+    data = serializer.data
+    data['description'] = description
+    data['rating'] = product.rating
+    data['sales_strategy'] = product.sales_strategy
+    data['review_count'] = product.comment_set.count()
+    data['detail_product'] = product.detail_product
+
+    return Response(data)
 
 # API to create a new product
 @api_view(['POST'])
@@ -168,7 +185,8 @@ def delete_product(request, seller_id, shop_id, product_id):
         return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-    
+
+import re
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
@@ -178,13 +196,13 @@ def get_featured_products(request):
             "product_id": product.product_id,
             "name": product.name,
             "description": re.sub(
-                r'(\n\s*)+', '\n',  # Thay thế nhiều ký tự xuống dòng liên tiếp bằng 1 '\n'
-                str(product.description).replace('__NEWLINE__', '\n').replace('\\n', '\n')
-            ).strip(),  # Loại bỏ khoảng trắng đầu/cuối
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
             "price": product.price,
-            "images": [
-                image.file for image in product.productimage_set.all()
-            ]
+            "rating": product.computed_rating,
+            "sales_strategy": product.sales_strategy,
+            "images": [image.file for image in product.productimage_set.all()]
         }
         for product in featured_products
     ]
@@ -220,20 +238,37 @@ def get_trending_products(request):
     ]
     return Response(serialized_data)
 
-
 # API to get random products (28 random products)
 @api_view(['GET'])
 def get_random_products(request):
     product_count = Product.objects.count()
+    if product_count == 0:
+        return Response([])  # Trả về danh sách rỗng nếu không có sản phẩm
+
     random_ids = random.sample(
         list(Product.objects.values_list('product_id', flat=True)),
         min(28, product_count)
     )
-    random_products = Product.objects.filter(product_id__in=random_ids)
-    serialized_data = ProductSerializer(random_products, many=True).data
+    random_products = Product.objects.filter(product_id__in=random_ids).prefetch_related('images')  # Sửa 'productimage_set' thành 'images'
+
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": re.sub(
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
+            "price": product.price,
+            "rating": product.computed_rating,
+            "sales_strategy": product.sales_strategy,
+            "images": [image.file for image in product.images.all()]  # Sửa 'productimage_set.all()' thành 'images.all()'
+        }
+        for product in random_products
+    ]
     return Response(serialized_data)
 
-# API to get popular categories (Top 3 categories with most products)
+# API to get popular categories (Top 3 categories with most subcategories)
 @api_view(['GET'])
 def get_popular_categories(request):
     # Annotate categories with the count of their subcategories
@@ -295,7 +330,7 @@ def homepage_api(request):
 def filter_by_category(request):
     category = request.GET.get('category')
     if category:
-        products = Product.objects.filter(category__category_name__iexact=category)
+        products = Product.objects.filter(subcategory__category__category_name__iexact=category)
         serialized_data = ProductSerializer(products, many=True).data
         return Response(serialized_data, status=200)
     return Response({"message": "Category parameter is required"}, status=400)
@@ -374,9 +409,10 @@ def filter_page(request):
         print(f"After search: {products.count()}")  # Debug log
 
     # Bộ lọc theo category
-    category = request.GET.get('category')
+    category = request.GET.get('category', '').strip()
     if category:
-        products = products.filter(category__category_name__iexact=category)
+        products = products.filter(subcategory__category__category_name__iexact=category)
+        print(f"After category: {products.count()}")  # Debug log
 
     # Bộ lọc theo price
     min_price = request.GET.get('min_price')
@@ -386,46 +422,56 @@ def filter_page(request):
             min_price = float(min_price)
             max_price = float(max_price)
             products = products.filter(price__gte=min_price, price__lte=max_price)
+            print(f"After price: {products.count()}")  # Debug log
         except ValueError:
-            return Response({"message": "Price parameters must be numeric"}, status=400)
+            pass
 
     # Bộ lọc theo color
-    color = request.GET.get('color')
+    color = request.GET.get('color', '').strip()
     if color:
         products = products.filter(color__iexact=color)
+        print(f"After color: {products.count()}")  # Debug log
 
     # Bộ lọc theo brand
-    brand = request.GET.get('brand')
+    brand = request.GET.get('brand', '').strip()
     if brand:
         products = products.filter(brand__iexact=brand)
+        print(f"After brand: {products.count()}")  # Debug log
 
     # Bộ lọc theo stock status
-    stock_status = request.GET.get('stock_status')
+    stock_status = request.GET.get('stock_status', '').strip()
     if stock_status:
         if stock_status == 'in_stock':
             products = products.filter(quantity__gt=0)
         elif stock_status == 'out_of_stock':
             products = products.filter(quantity=0)
+        print(f"After stock: {products.count()}")  # Debug log
 
     # Bộ lọc theo city và province
-    city = request.GET.get('city')
-    province = request.GET.get('province')
+    city = request.GET.get('city', '').strip()
+    province = request.GET.get('province', '').strip()
     if city:
-        products = products.filter(seller__user__sellerprofile__city__icontains=city)
+        products = products.filter(shop__user__city__icontains=city)
+        print(f"After city: {products.count()}")  # Debug log
     if province:
-        products = products.filter(seller__sellerprofile__province__icontains=province)
+        products = products.filter(shop__user__province__icontains=province)
+        print(f"After province: {products.count()}")  # Debug log
 
     # Serialize sản phẩm
     products_serialized = ProductSerializer(products, many=True).data
 
-    # Lọc người bán liên quan đến các sản phẩm đã lọc
-    related_sellers_ids = products.values_list('seller_id', flat=True).distinct()
-    sellers = SellerProfile.objects.filter(seller_id__in=related_sellers_ids)[:2]
+    # Lọc shop liên quan
+    related_shop_ids = products.values_list('shop_id', flat=True).distinct()
+    sellers = User.objects.filter(
+        shop__shop_id__in=related_shop_ids,
+        role__role_name='Seller'
+    )[:2]
     sellers_serialized = UserSerializer(sellers, many=True).data
 
     return Response({
         "products": products_serialized,
-        "top_sellers": sellers_serialized
+        "top_sellers": sellers_serialized,
+        "total_count": len(products_serialized)  # Thêm số lượng sản phẩm vào response
     }, status=200)
 
 @api_view(['GET'])

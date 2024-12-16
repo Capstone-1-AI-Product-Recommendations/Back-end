@@ -32,7 +32,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class ShippingAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShippingAddress
-        fields = ['recipient_name', 'recipient_phone', 'recipient_address']
+        fields = ['id', 'recipient_name', 'recipient_phone', 'recipient_address', 'is_default']
 
 class CartItemSerializer(serializers.ModelSerializer):
     class Meta:

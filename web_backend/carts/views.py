@@ -10,11 +10,13 @@ from django.db import transaction
 @api_view(['GET'])
 def get_cart(request, user_id):
     try:
-        cart = Cart.objects.get(user__user_id=user_id)
+        cart, created = Cart.objects.get_or_create(user__user_id=user_id)
+        if created or not cart.cartitem_set.exists():
+            return Response({"message": "Giỏ hàng trống"}, status=status.HTTP_200_OK)
         serializer = CartSerializer(cart)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    except Cart.DoesNotExist:
-        return Response({"error": "Giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"message": "Giỏ hàng trống"}, status=status.HTTP_200_OK)
 
 # Thêm sản phẩm vào giỏ hàng
 @api_view(['POST'])
@@ -67,34 +69,39 @@ def update_cart_item(request, user_id):
         if quantity <= 0:
             return Response({"error": "Số lượng phải lớn hơn 0"}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():  
-            if not cart_item_id or not quantity:
-                return Response({"error": "cart_item_id và quantity là bắt buộc"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Kiểm tra và lấy sản phẩm trong giỏ hàng
-            cart_item = CartItem.objects.select_related('product').get(cart__user__user_id=user_id, cart_item_id=cart_item_id)
+        with transaction.atomic():
+            # Kiểm tra và lấy sản phẩm trong giỏ hàng
+            cart_item = CartItem.objects.select_related('product').get(
+                cart__user__user_id=user_id, 
+                cart_item_id=cart_item_id
+            )
             product = cart_item.product
 
+            # Handle None values
+            current_quantity = cart_item.quantity if cart_item.quantity is not None else 0
+            product_quantity = product.quantity if product.quantity is not None else 0
+
             # Tính toán chênh lệch số lượng
-            quantity_difference = quantity - cart_item.quantity
+            quantity_difference = quantity - current_quantity
 
             # Kiểm tra nếu số lượng chênh lệch lớn hơn lượng hàng tồn kho
-            if quantity_difference > 0 and product.quantity < quantity_difference:
-                return Response({"error": "Không đủ số lượng sản phẩm trong kho"}, status=status.HTTP_400_BAD_REQUEST)
+            if quantity_difference > product_quantity:
+                return Response(
+                    {"error": "Số lượng yêu cầu vượt quá số lượng có sẵn trong kho"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            # Điều chỉnh số lượng trong kho
-            product.quantity -= quantity_difference
-            product.save()
-
-            # Cập nhật số lượng trong giỏ hàng
+            # Cập nhật số lượng trong giỏ hàng và kho
+            product.quantity = product_quantity - quantity_difference
             cart_item.quantity = quantity
+
+            product.save()
             cart_item.save()
 
-
-        return Response({"message": "Số lượng sản phẩm đã được cập nhật"}, status=status.HTTP_200_OK)
+            return Response({"message": "Cập nhật số lượng thành công"}, status=status.HTTP_200_OK)
 
     except CartItem.DoesNotExist:
-        return Response({"error": "Sản phẩm trong giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Sản phẩm không tồn tại trong giỏ hàng"}, status=status.HTTP_404_NOT_FOUND)
     except ValueError:
         return Response({"error": "Số lượng phải là số nguyên hợp lệ"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
@@ -103,12 +110,18 @@ def update_cart_item(request, user_id):
 # Xóa một sản phẩm khỏi giỏ hàng
 @api_view(['DELETE'])
 def remove_from_cart(request, user_id, cart_item_id):
+    print(user_id, cart_item_id)
     try:
         with transaction.atomic():
             # Lấy cart_item dựa vào cart_item_id
             cart_item = CartItem.objects.select_related('product').get(cart__user_id=user_id, cart_item_id=cart_item_id)
             product = cart_item.product
 
+              # Xử lý giá trị None bằng cách gán mặc định 0
+            if product.quantity is None:
+                product.quantity = 0
+            if cart_item.quantity is None:
+                cart_item.quantity = 0
             # Hoàn lại số lượng sản phẩm vào kho
             product.quantity += cart_item.quantity
             product.save()
@@ -133,4 +146,3 @@ def clear_cart(request, user_id):
         return Response({"error": "Giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": f"Đã xảy ra lỗi: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

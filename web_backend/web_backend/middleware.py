@@ -1,11 +1,12 @@
-import logging
 from django.utils.timezone import now
+from django.utils.deprecation import MiddlewareMixin
+import logging
 from web_backend.models import UserBrowsingBehavior, Product, User, CartItem, Cart
 
 # Cấu hình logging
 logger = logging.getLogger(__name__)
 
-class UserActivityLoggingMiddleware:
+class UserActivityLoggingMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -13,31 +14,32 @@ class UserActivityLoggingMiddleware:
         response = self.get_response(request)
 
         if request.method == 'GET' and 'products/detail' in request.path:
-            # Lấy user_id và product_id từ URL
-            user_id = request.resolver_match.kwargs.get('user_id')
-            product_id = request.resolver_match.kwargs.get('product_id')
+            if request.resolver_match:
+                user_id = request.resolver_match.kwargs.get('user_id')
+                product_id = request.resolver_match.kwargs.get('product_id')
 
-            if user_id and product_id:
-                try:
-                    user = User.objects.get(user_id=user_id)
-                    product = Product.objects.get(product_id=product_id)
+                if user_id and product_id:
+                    try:
+                        user = User.objects.get(user_id=user_id)
+                        product = Product.objects.get(product_id=product_id)
 
-                    # Lưu hành động vào database
-                    UserBrowsingBehavior.objects.create(
-                        user=user,
-                        product=product,
-                        activity_type='viewed_product',
-                        interaction_value=1.0,
-                        timestamp=now(),
-                    )
+                        # Lưu hành động vào database
+                        UserBrowsingBehavior.objects.create(
+                            user=user,
+                            product=product,
+                            activity_type='viewed_product',
+                            interaction_value=1.0,
+                            timestamp=now(),
+                        )
 
-                    logger.info(f"User {user.username} viewed product {product.name}")
+                        logger.info(f"User {user.username} viewed product {product.name}")
 
-                except User.DoesNotExist:
-                    logger.error(f"User with ID {user_id} does not exist")
-                except Product.DoesNotExist:
-                    logger.error(f"Product with ID {product_id} does not exist")
-            # Lưu hành động tìm kiếm sản phẩm
+                    except User.DoesNotExist:
+                        logger.error(f"User with ID {user_id} does not exist")
+                    except Product.DoesNotExist:
+                        logger.error(f"Product with ID {product_id} does not exist")
+
+        # Lưu hành động tìm kiếm sản phẩm
         if request.method == 'GET' and 'search/' in request.path:
             user_id = request.GET.get('user_id')  # Nếu user_id được truyền qua query params, hoặc có thể lấy từ session
 

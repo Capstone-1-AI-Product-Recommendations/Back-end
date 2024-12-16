@@ -1,5 +1,8 @@
 # users/serializers.py
 from rest_framework import serializers
+# from .models import Role, UserBankAccount, User
+from web_backend.models import *
+from rest_framework import serializers
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 # from .models import User, Role
 class RoleSerializer(serializers.ModelSerializer):
@@ -39,11 +42,14 @@ class UserBrowsingBehaviorSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class UserSerializer(serializers.ModelSerializer):
-    role_name = serializers.CharField(source='role.role_name', read_only=True)
+    role_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'full_name', 'role_name', 'created_at', 'updated_at']
+        fields = ['user_id', 'username', 'email', 'full_name', 'created_at', 'updated_at', 'role_name']
+
+    def get_role_name(self, obj):
+        return obj.role.role_name if obj.role else None
 
 class LoginUserSerializer(serializers.ModelSerializer):
     role = serializers.CharField(source='role.role_name', read_only=True)
@@ -57,14 +63,3 @@ class LoginUserSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = UserBankAccount
 #         fields = ['account_id', 'account_number', 'bank_name', 'user_id']
-
-class UserSerializer(serializers.ModelSerializer):
-    role_name = serializers.CharField(source='role.role_name', read_only=True)  # Get the role_name from the related Role model
-    city = serializers.CharField(max_length=100, required=False, allow_blank=True)  # Added city field
-    province = serializers.CharField(max_length=100, required=False, allow_blank=True)  # Added province field
-
-    class Meta:
-        model = User
-        fields = ['user_id', 'username', 'email', 'role_name', 'city', 'province']  # Added city and province fields
-
-

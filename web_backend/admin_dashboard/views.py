@@ -111,12 +111,6 @@ def search_users(request):
     if not username_query and not email_query and not role_query:
         return Response({'message': 'Please provide at least one search parameter (username, email, or role).'}, status=status.HTTP_400_BAD_REQUEST)
 
-    users = User.objects.filter(
-        Q(username__icontains=query) |
-        Q(email__icontains=query) |
-        Q(role__role_name__icontains=query)
-    ).distinct()
-
     # Tạo đối tượng Q để xây dựng truy vấn tìm kiếm
     query_conditions = Q()
 
@@ -498,8 +492,8 @@ def get_new_customers_by_period(request, period):
 
 # API lấy thông tin admin
 @api_view(['GET'])
+# @admin_required
 @permission_classes([AllowAny])
-@admin_required
 def get_admin_info(request):
     try:
         admin_role = Role.objects.get(name='admin')  # Vai trò admin
@@ -525,8 +519,6 @@ def get_admin_info(request):
 @api_view(['PUT'])
 # @admin_required
 @permission_classes([AllowAny])
-
-@admin_required
 def update_admin_info(request, admin_id):
     try:
         admin_role = Role.objects.get(name='admin')
