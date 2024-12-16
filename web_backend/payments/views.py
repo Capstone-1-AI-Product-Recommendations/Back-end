@@ -37,9 +37,9 @@ def payos(request, user_id, order_id):
         order_id=order_id,
         user_id=user_id
     ).exclude(
-        status="Canceled"
+        status="Đã hủy"
     ).filter(
-        status__in=["Pending", "Processing"]
+        status__in=["Chờ xác nhận", "Đang xử lý"]
     ).first()
 
     if order is None:
@@ -92,7 +92,7 @@ def payos(request, user_id, order_id):
             payment_link = payos.createPaymentLink(paymentData=payment_data)
             payment = Payment.objects.create(
                 amount=order.total,
-                status="Pending",  # Ban đầu trạng thái sẽ là Pending
+                status="Đã xác nhận",  # Ban đầu trạng thái sẽ là 
                 payment_method="PayOS",  # Phương thức thanh toán (ví dụ)
                 transaction_id=None,  # Ghi sau khi thanh toán hoàn thành
                 created_at=timezone.now(),
@@ -153,7 +153,7 @@ def payment_cod(request, user_id, order_id):
             order=order,
             user=user,
             amount=total_amount,
-            status="Pending",
+            status="Chờ xác nhận",
             payment_method="COD",  # Phương thức thanh toán là COD
             transaction_id="COD-" + str(order.order_id)  # Mã giao dịch giả cho COD
         )
@@ -318,7 +318,7 @@ def vnpay(request, user_id, order_id):
             order=order,
             user=order.user,
             amount=order.total,
-            status="Pending",
+            status="Chờ xác nhận",
             payment_method="VNPay",
             transaction_id=vnp.requestData['vnp_TxnRef']
         )

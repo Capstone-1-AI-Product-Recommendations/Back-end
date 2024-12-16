@@ -1,12 +1,12 @@
 from django.urls import path
-from .views import delete_shop, update_shop, get_shop_info, get_orders, create_shop, get_order_details, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report, get_comments_for_product, sales_report_for_product, ad_performance_for_product, get_product_recommendations_for_product, update_order_status
+from .views import *
 # seller_dashboard/urls.py
 from . import views
 
 urlpatterns = [
     # Quản lý đơn hàng
     path('seller/orders/<int:seller_id>/', get_orders, name='get_orders'),
-    path('seller/<int:seller_id>/orders_details/<int:order_id>/', get_order_details, name='get_order_details'),
+    path('seller/<int:seller_id>/order_status_summary/<int:shop_id>/', get_order_status_summary, name='order_status_summary'),
 
     # Quản lý quảng cáo
 #     path('seller/<int:seller_id>/create_ads/<int:product_id>/', views.create_ad, name='create_ad'),

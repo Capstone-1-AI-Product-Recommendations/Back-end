@@ -277,7 +277,7 @@ class UserBankAccount(models.Model):
     account_holder_name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=50, blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING)
-
+    qr_code = models.CharField(max_length=200)
     class Meta:
         managed = False
         db_table = 'user_bank_account'
@@ -307,9 +307,9 @@ class ShippingAddress(models.Model):
 
 class PurchasedProduct(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
+        ('chờ xác nhận', 'Chờ xác nhận'),
+        ('đã giao', 'Đã giao'),
+        ('đã hủy', 'Đã hủy'),
     ]
 
     purchased_product_id = models.AutoField(primary_key=True)
@@ -319,7 +319,7 @@ class PurchasedProduct(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='purchased_products')  # Liên kết với đơn hàng
     quantity = models.IntegerField()
     price_at_purchase = models.DecimalField(max_digits=15, decimal_places=2)  # Lưu giá sản phẩm tại thời điểm mua
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Chờ xác nhận')
     purchased_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -34,7 +34,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         try:
             # Kiểm tra Order có tồn tại không
             order = Order.objects.get(pk=value)
-            if order.status != "Pending":  # Ví dụ kiểm tra trạng thái order
+            if order.status != "Chờ xác nhận":  # Ví dụ kiểm tra trạng thái order
                 raise serializers.ValidationError("Order must be in Pending status.")
             return order
         except Order.DoesNotExist:
@@ -51,7 +51,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             order=order,
             user=user,
             amount=amount,
-            status="Pending",
+            status="Chờ xác nhận",
             payment_method=validated_data.get('payment_method'),
             transaction_id=validated_data.get('transaction_id', ""),  # Optional
         )

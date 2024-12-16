@@ -31,7 +31,7 @@ def create_order(request, user_id):
     order = Order.objects.create(
         user=user,
         total=0,
-        status='Pending',
+        status='Chờ xác nhận',
     )
 
     total_amount = 0
@@ -55,7 +55,7 @@ def create_order(request, user_id):
             order=order,
             quantity=quantity,
             price_at_purchase=price,
-            status='pending',  # Mặc định trạng thái ban đầu là `completed`
+            status='Chờ xác nhận',  # Mặc định trạng thái ban đầu là `completed`
             purchased_at=timezone.now(),  # Ngày giờ mua
         )
 
@@ -133,7 +133,7 @@ def cancel_order_item(request, user_id, order_item_id):
     order = order_item.order
 
     # Kiểm tra nếu đơn hàng đã hủy hoặc đã giao
-    if order.status in ['Canceled', 'Delivered', 'Confirmed']:
+    if order.status in ['Đã hủy', 'Đã giao', 'Đã xác nhận']:
         return Response({"error": f"Không thể hủy sản phẩm trong đơn hàng đã ở trạng thái '{order.status}'."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Cập nhật số lượng sản phẩm trong Product
@@ -149,7 +149,7 @@ def cancel_order_item(request, user_id, order_item_id):
     order_item.delete()
     # Kiểm tra xem đơn hàng còn sản phẩm nào không, nếu không có thì hủy đơn hàng
     if not order.orderitem_set.exists():
-        order.status = 'Canceled'  # Nếu không còn sản phẩm, hủy đơn hàng
+        order.status = 'Đã hủy'  # Nếu không còn sản phẩm, hủy đơn hàng
         order.save()
 
     return Response({"message": "Đơn hàng đã được hủy."}, status=status.HTTP_200_OK)

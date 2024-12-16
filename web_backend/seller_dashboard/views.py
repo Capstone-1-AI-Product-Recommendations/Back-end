@@ -10,10 +10,34 @@ from django.http import JsonResponse
 from rest_framework import status
 from datetime import date
 from users.decorators import seller_required
+from django.db.models import Count
 # from .serializers import AdSerializer, ProductSerializer, 
 # from .models import Ad, ProductAd
 # from products.models import Product
 
+@api_view(['GET'])
+def get_order_status_summary(request, seller_id, shop_id):
+    try:
+        # Kiểm tra shop thuộc sở hữu của seller
+        shop = Shop.objects.filter(shop_id=shop_id, user__user_id=seller_id).first()  # user_id của Shop liên kết với seller_id
+        if not shop:
+            return Response({"status": "error", "message": "Shop không tồn tại hoặc không thuộc seller này."}, status=404)
+
+        # Lấy danh sách sản phẩm trong shop
+        product_ids = Product.objects.filter(shop_id=shop.shop_id).values_list('product_id', flat=True)
+
+        # Lấy danh sách order item chứa các sản phẩm từ shop
+        order_ids = OrderItem.objects.filter(product_id__in=product_ids).values_list('order_id', flat=True)
+
+        # Thống kê trạng thái đơn hàng
+        status_summary = Order.objects.filter(order_id__in=order_ids).values('status').annotate(total=Count('status'))
+
+        # Kết quả trả về
+        data = {entry['status']: entry['total'] for entry in status_summary}
+
+        return Response({"status": "success", "data": data}, status=200)
+    except Exception as e:
+        return Response({"status": "error", "message": str(e)}, status=500)
 
 # Quản lý đơn hàng
 @api_view(['GET'])
@@ -89,16 +113,16 @@ def update_order_status(request, order_item_id, seller_id):
         
         elif request.method == 'PUT':
             # Kiểm tra trạng thái hiện tại của đơn hàng
-            if order.status == 'Confirmed':
+            if order.status == 'Xác nhận':
                 return Response({"error": "Đơn hàng đã được xác nhận."}, status=status.HTTP_400_BAD_REQUEST)
-            elif order.status == 'Canceled':
+            elif order.status == 'Đã hủy':
                 return Response({"error": "Đơn hàng đã bị hủy."}, status=status.HTTP_400_BAD_REQUEST)
             # Cập nhật trạng thái đơn hàng từ 'Pending' sang 'Confirmed'
-            order.status = 'Confirmed'
+            order.status = 'Đã xác nhận'
             order.save()
             purchased_products = PurchasedProduct.objects.filter(order_id=order.order_id)
             for purchased_product in purchased_products:
-                purchased_product.status = 'Confirmed'  # Hoặc giá trị trạng thái khác tùy vào yêu cầu
+                purchased_product.status = 'Xác nhận'  # Hoặc giá trị trạng thái khác tùy vào yêu cầu
                 purchased_product.save()
             return Response({"message": "Trạng thái đơn hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
     
