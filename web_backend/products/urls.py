@@ -3,7 +3,7 @@ from .views import (product_detail, create_product, update_product, delete_produ
     get_featured_products, get_trending_products, get_random_products,
     get_popular_categories, get_all_categories, get_latest_comments,
     filter_by_category, filter_by_price, filter_by_color, filter_by_brand,
-    filter_by_stock_status, filter_page
+    filter_by_stock_status, filter_page, get_random_relevant_products
 )
 
 urlpatterns = [
@@ -17,6 +17,7 @@ urlpatterns = [
     path('featured/', get_featured_products, name='featured_products'),
     path('trending/', get_trending_products, name='trending_products'),
     path('random/', get_random_products, name='random_products'),
+    path('random-relevant/', get_random_relevant_products, name='random_relevant_products'),
 
     # Categories APIs
     path('popular-categories/', get_popular_categories, name='popular_categories'),
