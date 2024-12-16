@@ -225,6 +225,58 @@ def get_random_products(request):
         for product in random_products
     ]
     return Response(serialized_data)
+#API random sản phẩm dựa vào bảng UserBrowsingBehavior
+@api_view(['GET'])
+def get_random_relevant_products(request):
+    user_id = request.query_params.get('user_id')  # Lấy user_id từ query parameter
+    if not user_id:
+        return Response({"error": "Missing user_id"}, status=400)
+
+    # Lấy các sản phẩm liên quan từ UserBrowsingBehavior
+    user_behaviors = UserBrowsingBehavior.objects.filter(user_id=user_id)
+    if not user_behaviors.exists():
+        return Response([])  # Trả về danh sách rỗng nếu không có hành vi người dùng
+
+    # Lấy danh sách các sản phẩm đã tương tác
+    interacted_product_ids = user_behaviors.values_list('product_id', flat=True)
+
+    # Lấy danh sách các danh mục liên quan từ các sản phẩm đã tương tác
+    related_categories = Product.objects.filter(
+        product_id__in=interacted_product_ids
+    ).values_list('subcategory_id', flat=True)
+
+    # Lấy sản phẩm liên quan (trong cùng danh mục hoặc sản phẩm đã tương tác)
+    related_products = Product.objects.filter(
+        Q(subcategory_id__in=related_categories) | Q(product_id__in=interacted_product_ids)
+    ).exclude(product_id__in=interacted_product_ids)  # Loại trừ sản phẩm đã tương tác
+
+    if not related_products.exists():
+        return Response([])  # Trả về danh sách rỗng nếu không có sản phẩm liên quan
+
+    # Random lấy tối đa 28 sản phẩm từ các sản phẩm liên quan
+    random_products = random.sample(list(related_products), min(28, related_products.count()))
+
+    # Tối ưu hóa việc truy xuất hình ảnh (nếu có model ProductImage)
+    random_products = Product.objects.filter(product_id__in=[p.product_id for p in random_products]).prefetch_related('productimage_set')
+
+    # Chuẩn bị dữ liệu JSON trả về
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": re.sub(
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
+            "price": product.price,
+            "rating": product.rating,
+            "sales_strategy": product.sales_strategy,
+            "images": [image.file for image in product.productimage_set.all()]
+        }
+        for product in random_products
+    ]
+
+    return Response(serialized_data)
 
 # API to get popular categories (Top 3 categories with most subcategories)
 @api_view(['GET'])

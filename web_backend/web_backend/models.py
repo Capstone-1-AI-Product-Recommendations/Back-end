@@ -5,6 +5,8 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+from datetime import timezone
+
 from django.db import models
 from django.db.models import Avg
 
@@ -159,7 +161,6 @@ class Product(models.Model):
     shop = models.ForeignKey('Shop', on_delete=models.SET_NULL, blank=True, null=True)
     rating = models.IntegerField(blank=True, null=True)
     promotion_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    event_id = models.IntegerField(blank=True, null=True)
     sales_strategy = models.IntegerField(blank=True, null=True)
     review_count = models.IntegerField(blank=True, null=True)
 
@@ -174,6 +175,7 @@ class Product(models.Model):
     @property
     def stock_status(self):
         return 'in_stock' if self.quantity > 0 else 'out_of_stock'
+
     def update_computed_rating(self):
         """
         Tính toán và cập nhật trường `rating` dựa trên rating trung bình từ các comment.
@@ -213,8 +215,7 @@ from django.dispatch import receiver
 
 @receiver(pre_save, sender=Product)
 def update_is_featured(sender, instance, **kwargs):
-    # Kiểm tra các tiêu chí: có giá khuyến mãi, thuộc sự kiện, hoặc được quảng cáo
-    if instance.promotion_price or instance.event_id or instance.ads.exists():
+    if instance.promotion_price or instance.ads.exists():
         instance.is_featured = True
     else:
         instance.is_featured = False
@@ -227,6 +228,25 @@ class ProductAd(models.Model):
     class Meta:
         managed = False
         db_table = 'product_ad'
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+@receiver(post_save, sender=ProductAd)
+def update_promotion_price_on_product_ad_save(sender, instance, **kwargs):
+    """
+    Cập nhật promotion_price mỗi khi ProductAd được lưu.
+    """
+    product = instance.product
+    ad = instance.ad
+
+    # Kiểm tra thời gian áp dụng quảng cáo
+    if ad.start_date <= timezone.now().date() <= ad.end_date:
+        discount_percentage = ad.discount_percentage
+        # Tính toán giá khuyến mãi
+        promotion_price = product.price * (1 - discount_percentage / 100)
+        # Cập nhật giá trị vào trường promotion_price
+        product.promotion_price = round(promotion_price, 2)
+        product.save()
 
 
 class ProductImage(models.Model):
