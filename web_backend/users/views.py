@@ -23,6 +23,7 @@ import re, random
 from django.forms import ValidationError 
 from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import MultiPartParser, FormParser
 # from rest_framework.views import APIView
 # from rest_framework.permissions import IsAdminUser
 # from .decorators import admin_required
@@ -398,7 +399,11 @@ def user_bank_accounts_list_create(request, user_id):
         return Response(serializer.data)
 
     elif request.method == 'POST':
+        if UserBankAccount.objects.filter(user=user).exists():
+            return Response({"error": "Bạn đã có tài khoản ngân hàng."}, status=status.HTTP_400_BAD_REQUEST)
+        parser_classes = [MultiPartParser, FormParser]  # Chấp nhận file upload
         serializer = UserBankAccountSerializer(data=request.data, context={'user': user})
+        
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

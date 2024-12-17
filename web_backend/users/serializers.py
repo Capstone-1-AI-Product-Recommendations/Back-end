@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
+import cloudinary.uploader
 # from .models import User, Role
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -7,15 +8,31 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ['role_id', 'role_name']
 
 class UserBankAccountSerializer(serializers.ModelSerializer):
+    qr_code_image = serializers.ImageField(write_only=True, required=True)  # Đảm bảo trường này nhận file
+    qr_code = serializers.CharField(read_only=True)  # Trả về URL ảnh
+
     class Meta:
         model = UserBankAccount
-        fields = ['bank_account_id', 'bank_name', 'account_number', 'account_holder_name', 'account_type', 'user']
+        fields = ['bank_account_id', 'bank_name', 'account_number', 'account_holder_name', 'account_type', 'user', 'qr_code', 'qr_code_image']
         read_only_fields = ['user']
+
     def create(self, validated_data):
-        # Gán user từ context (truyền từ view)
-        user = self.context['user']
-        validated_data['user'] = user
+        user = self.context['user']  # Lấy user từ context
+        qr_code_image = validated_data.pop('qr_code_image')  # Lấy file ảnh từ request
+
+        # Kiểm tra nếu không có ảnh
+        if not qr_code_image:
+            raise serializers.ValidationError({"qr_code_image": ["This field is required."]})
+        
+        # Upload ảnh lên Cloudinary
+        upload_result = cloudinary.uploader.upload(qr_code_image)
+        qr_code_url = upload_result['secure_url']  # Lấy URL ảnh
+
+        validated_data['qr_code'] = qr_code_url  # Gán URL ảnh vào validated_data
+        validated_data['user'] = user  # Gán user
+
         return super().create(validated_data)
+
 class RegisUserSerializer(serializers.ModelSerializer):
     # role = RoleSerializer(required=False, allow_null=True)
     bank_accounts = UserBankAccountSerializer(many=True, read_only=True, source='userbankaccount_set')

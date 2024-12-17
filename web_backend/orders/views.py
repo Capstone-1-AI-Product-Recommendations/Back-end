@@ -6,6 +6,31 @@ from .serializers import OrderSerializer, ShippingAddressSerializer
 import json
 from django.utils import timezone
 
+@api_view(['GET'])
+def get_orders(request, user_id, order_id=None):
+    try:
+        # Kiểm tra user_id hợp lệ
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    if order_id:
+        # Lấy order cụ thể dựa trên order_id và user
+        try:
+            order = Order.objects.get(
+                order_id=order_id,
+                orderitem__product__shop__user=user
+            )
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found or unauthorized."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = OrderSerializer(order)
+        return Response(serializer.data)
+
+    # Lấy tất cả các đơn hàng của user nếu không có order_id
+    orders = Order.objects.filter(orderitem__product__shop__user=user).distinct()
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)
+
 @api_view(['POST'])
 def create_order(request, user_id):
     try:
@@ -61,7 +86,6 @@ def create_order(request, user_id):
 
     order.total = total_amount
     order.save()
-    cart_items.delete()
 
     # Xử lý thông tin nhận hàng
     recipient_name = request.data.get('recipient_name', user.full_name) or user.full_name

@@ -1,11 +1,11 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Order, OrderItem, User, Payment, ShippingAddress, UserBankAccount
+from web_backend.models import *
 from django.conf import settings
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from payos import PayOS
 from payos.type import PaymentData, ItemData
 import hashlib, hmac, json
@@ -16,6 +16,7 @@ from web_backend.utils import transfer_funds
 from datetime import datetime
 import urllib.parse 
 from django.utils import timezone
+from django.http import JsonResponse
 
 # Khởi tạo đối tượng PayOS
 payOS = PayOS(
@@ -78,8 +79,8 @@ def payos(request, user_id, order_id):
             amount=int(order.total),  # Số tiền thanh toán
             description=description,
             items=items,  # Các mặt hàng trong đơn
-            cancelUrl="http://localhost:8000/cancel",  # URL khi thanh toán bị hủy
-            returnUrl="http://localhost:8000/return"  # URL khi thanh toán thành công
+            cancelUrl="http://127.0.0.1:8000/api/payos/callback/",  # URL khi thanh toán bị hủy
+            returnUrl="http://127.0.0.1:8000/api/payos/callback/"  # URL khi thanh toán thành công
         )
         # Khởi tạo đối tượng PayOS
         try:
@@ -108,6 +109,47 @@ def payos(request, user_id, order_id):
         except Exception as e:
             return Response({"error": f"Payment processing failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
+@api_view(['GET'])
+def payos_callback(request):
+    raw_data = request.GET.dict()
+    print("Raw PayOS data:", raw_data)
+
+    # Xác minh thanh toán
+    if raw_data.get("code") == "00" and raw_data.get("status") == "PAID":
+        order_code = raw_data.get("orderCode")
+        transaction_id = raw_data.get("id")
+
+        # Cập nhật đơn hàng và tạo thông báo cho seller
+        try:
+            order = Order.objects.get(order_id=order_code)
+            order.status = "Đã thanh toán"
+            order.save()
+
+            # Tạo thông báo cho seller có sản phẩm trong đơn hàng
+            order_items = OrderItem.objects.filter(order=order)
+            product_ids_in_order = [item.product.product_id  for item in order_items]
+
+            # Xóa các item trong giỏ hàng của người dùng đã mua sản phẩm
+            CartItem.objects.filter(cart__user=order.user, product_id__in=product_ids_in_order).delete()
+
+            # Tạo thông báo cho seller
+            for item in order_items:
+                Notification.objects.create(
+                    message=f"Bạn có đơn hàng mới: {order.order_id}",
+                    user=item.product.shop.user,  # User chủ shop
+                    is_read=0
+                )
+
+            return Response({
+                "message": "Thanh toán thành công"
+            }, status=status.HTTP_200_OK)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        return Response({"error": "Thanh toán thất bại"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
 @api_view(['GET', 'POST'])
 def payment_cod(request, user_id, order_id):
     # Kiểm tra xem user_id và order_id có hợp lệ không
@@ -123,8 +165,10 @@ def payment_cod(request, user_id, order_id):
 
     # Tạo danh sách các món hàng
     items_details = []
+    product_ids_in_order = []
     for item in order_items:
         total_amount += item.price * item.quantity
+        product_ids_in_order.append(item.product.product_id)
         items_details.append({
             "product_name": item.product.name,
             "quantity": item.quantity,
@@ -157,6 +201,7 @@ def payment_cod(request, user_id, order_id):
             payment_method="COD",  # Phương thức thanh toán là COD
             transaction_id="COD-" + str(order.order_id)  # Mã giao dịch giả cho COD
         )
+        CartItem.objects.filter(cart__user=user, product_id__in=product_ids_in_order).delete()
 
         # Dữ liệu trả về
         response_data = {
@@ -200,19 +245,22 @@ def process_transfer(request, admin_id, order_id, seller_id):
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
 
     # Lấy danh sách các sản phẩm trong đơn hàng thuộc về seller này
-    order_items = OrderItem.objects.filter(order=order, product__seller=seller)
+    order_items = OrderItem.objects.filter(order=order, product__shop__user=seller)
 
     # Tính toán tổng tiền seller nhận được
     total_amount = sum(item.price * item.quantity for item in order_items)
 
-    # Chuyển 0.95 thành Decimal để tránh lỗi kiểu dữ liệu
-    net_amount = total_amount * Decimal('0.95')  # Admin giữ lại 5%
+    # Trừ đi 10% hoa hồng của admin
+    net_amount = total_amount * Decimal('0.90')  # Seller nhận 90%, Admin giữ 10%
 
     try:
         # Lấy thông tin tài khoản ngân hàng của seller
         bank_account = UserBankAccount.objects.get(user=seller)
     except UserBankAccount.DoesNotExist:
         return Response({"detail": "Bank account not found for seller."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy mã QR từ UserBankAccount
+    qr_code = bank_account.qr_code
 
     # Nếu phương thức là GET: trả về thông tin về transfer
     if request.method == 'GET':
@@ -222,7 +270,8 @@ def process_transfer(request, admin_id, order_id, seller_id):
             "seller_account_number": bank_account.account_number,
             "total_amount": str(total_amount),  # Chuyển Decimal thành str
             "net_amount": str(net_amount),      # Chuyển Decimal thành str
-            "order_items": [{"product": item.product.name, "quantity": item.quantity, "price": str(item.price)} for item in order_items]
+            "order_items": [{"product": item.product.name, "quantity": item.quantity, "price": str(item.price)} for item in order_items],
+            "qr_code": qr_code  # Trả về URL của mã QR
         }
         return Response(transfer_details)
 
