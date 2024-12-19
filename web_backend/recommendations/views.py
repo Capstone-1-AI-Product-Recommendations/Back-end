@@ -1,156 +1,66 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.decorators import api_view
+from django.core.cache import cache 
 from rest_framework.response import Response
-from web_backend.models import *
-from products.serializers import ProductSerializer
-import joblib
-from django.shortcuts import render
-from django.http import JsonResponse
-import numpy as np
-import pandas as pd
-from django.db.models import Avg, Count, Sum
+from rest_framework.views import APIView
+from .tasks import generate_recommendations
+from celery.result import AsyncResult
+import json
 
-# Tải các mô hình đã huấn luyện
-svd = joblib.load('recommendations/models/svd_model.pkl')
-cosine_sim = joblib.load('recommendations/models/cosine_sim.pkl')
-user_similarity = joblib.load('recommendations/models/user_similarity.pkl')
-user_item_matrix = joblib.load('recommendations/models/user_item_matrix.pkl')
+class BatchRecommendationsView(APIView):
+    def get(self, request, user_id):
+        # Kiểm tra user_id hợp lệ
+        if not user_id:
+            return Response({"error": "Invalid user_id"}, status=400)
 
-from sklearn.preprocessing import MinMaxScaler
+        # Tạo cache key để ánh xạ user_id -> task_id
+        user_task_key = f"user_task_map:{user_id}"
+        task_user_key = f"task_user_map"
 
-# Loại bỏ sự tương đồng chính nó
-np.fill_diagonal(cosine_sim, 0)
+        # Kiểm tra xem user_id đã có task_id chưa
+        existing_task_id = cache.get(user_task_key)
+        if existing_task_id:
+            print(f"User {user_id} đã có task_id: {existing_task_id}, trả về task cũ")
+            return Response({"user_id": user_id, "task_id": existing_task_id})
 
-# Chuẩn hóa ma trận cosine similarity
-scaler = MinMaxScaler()
-cosine_sim_normalized = scaler.fit_transform(cosine_sim)
-# Hàm Hybrid Recommendation
-def hybrid_recommendation(user_item_matrix, cosine_sim_normalized, svd, user_similarity, product_id, user_id, top_n=10):
-    user_idx = user_id - 1
-    cf_scores = svd.inverse_transform(svd.transform(user_item_matrix))[user_idx]
-    
-    try:
-        product = Product.objects.get(product_id=product_id)
-        product_idx = product.product_id - 1
-    except Product.DoesNotExist:
-        return []
-    
-    # Sử dụng ma trận cosine similarity đã chuẩn hóa
-    cbf_scores = cosine_sim_normalized[product_idx]
-    user_idx_similarity = np.argsort(user_similarity[user_idx])[::-1]
-    user_similarity_scores = user_similarity[user_idx, user_idx_similarity]
-    
-    # Kết hợp CF, CBF và User-User Similarity
-    hybrid_scores = 0.2 * cf_scores + 0.5 * cbf_scores + 0.3 * user_similarity_scores[:len(cf_scores)]
-    recommended_idx = np.argsort(hybrid_scores)[-top_n:][::-1]
-    
-    recommended_products = []
-    for idx in recommended_idx:
-        product = Product.objects.filter(product_id=idx + 1).first()
-        if product:
-            recommended_products.append(product.product_id)
-    
-    return recommended_products
+        # Nếu chưa có trong cache, tạo task mới
+        print(f"User {user_id} chưa có task, tạo task mới")
+        task = generate_recommendations.delay(user_id)
 
-# Hàm đề xuất cho người dùng mới (Cold Start Problem)
-def recommend_for_new_user(product_id, top_n=5):
-    # 1. Đề xuất sản phẩm phổ biến (Top sản phẩm có lượng bán cao)
-    popular_products = Product.objects.annotate(
-        sales_count=Sum('orderitem__quantity')
-    ).order_by('-sales_count')[:top_n]  # Lấy top N sản phẩm phổ biến
-    
-    # Nếu không có sản phẩm phổ biến, trả về danh sách trống
-    if not popular_products:
-        return []
+        # Lưu ánh xạ user_id -> task_id và task_id -> user_id
+        cache.set(user_task_key, task.id, timeout=3600)  # Lưu user_id -> task_id
+        cache.set(f"{task_user_key}:{task.id}", {"user_id": user_id}, timeout=3600)  # Lưu task_id -> user_id
 
-    # 2. Tính sự tương đồng giữa sản phẩm được đưa vào và các sản phẩm khác (Content-based Filtering)
-    try:
-        product = Product.objects.get(product_id=product_id)
-        product_idx = product.product_id - 1  # Chuyển từ ID (1-based) sang index (0-based)
-    except Product.DoesNotExist:
-        return []  # Nếu sản phẩm không tồn tại, trả về danh sách trống
+        print(f"New task_id={task.id} created for user_id={user_id}")
+        return Response({"task_id": task.id})
 
-    cbf_scores = cosine_sim[product_idx]
-    similar_products_idx = np.argsort(cbf_scores)[-top_n:][::-1]  # Sắp xếp sản phẩm tương tự theo điểm cosine giảm dần
 
-    # Lấy tất cả các sản phẩm tương tự từ CBF bằng cách lọc nhiều product_id cùng lúc
-    recommended_products = Product.objects.filter(product_id__in=[idx + 1 for idx in similar_products_idx])
+class GetBatchRecommendationsView(APIView):
+    def get(self, request, task_id):
+        # Tạo cache key để ánh xạ task_id -> user_id
+        task_user_key = f"task_user_map:{task_id}"
 
-    # Kết hợp sản phẩm phổ biến với sản phẩm tương tự từ CBF
-    recommended_product_ids = [product.product_id for product in popular_products] + [product.product_id for product in recommended_products]
-    
-    # Giới hạn số lượng sản phẩm đề xuất tối đa là top_n
-    return recommended_product_ids[:top_n]
+        # Lấy user_id từ cache dựa trên task_id
+        user_data = cache.get(task_user_key)
+        user_id = user_data.get("user_id") if user_data else None
+        if not user_id:
+            return Response({"error": "User ID not found for this task ID"}, status=404)
 
-@api_view(['GET'])
-# @permission_classes([AllowAny])
-def get_recommended_products(request):
-    try:
-        product_id = request.GET.get('product_id', '').strip()
-        user_id = request.GET.get('user_id', '').strip()
+        # Kiểm tra trạng thái task
+        result = AsyncResult(task_id)
+        print(f"Checking status for task_id={task_id}, user_id={user_id}")
 
-        # Xử lý khi không có product_id
-        if not product_id:
-            if not user_id or user_id == '0':
-                popular_products = Product.objects.annotate(
-                    sales_count=Sum('orderitem__quantity', default=0)
-                ).order_by('-sales_count')[:10].prefetch_related('productimage_set')
+        # Nếu task đã hoàn thành, kiểm tra cache
+        if result.status == "SUCCESS":
+            # Lưu kết quả vào cache nếu chưa có
+            result_cache_key = f"recommendation_result:{user_id}"
+            cached_result = cache.get(result_cache_key)
+            if not cached_result:
+                cache.set(result_cache_key, result.result, timeout=86400)
+                print(f"Kết quả đã được lưu vào cache với key: {result_cache_key}")
 
-                serialized_data = [
-                    {
-                        "product_id": product.product_id,
-                        "name": product.name,
-                        "description": product.description,
-                        "price": product.price,
-                        "images": [image.file for image in product.productimage_set.all()] if product.productimage_set.exists() else []
-                    }
-                    for product in popular_products
-                ]
-                return Response(serialized_data)
-
-            else:
-                return Response({"error": "product_id is required for existing users"}, status=400)
-
-        if not product_id.isdigit():
-            return Response({"error": "Invalid product_id"}, status=400)
-
-        product_id = int(product_id)
-
-        # Xử lý người dùng mới hoặc người dùng hiện tại
-        if not user_id or user_id == '0':
-            recommended_product_ids = recommend_for_new_user(product_id)
-        else:
-            if not user_id.isdigit():
-                return Response({"error": "Invalid user_id"}, status=400)
-
-            user_id = int(user_id)
-            recommended_product_ids = hybrid_recommendation(
-                user_item_matrix,
-                cosine_sim,
-                svd,
-                user_similarity,
-                product_id,
-                user_id
-            )
-
-        recommended_products = Product.objects.filter(product_id__in=recommended_product_ids).prefetch_related(
-            'productimage_set')
-
-        serialized_data = [
-            {
-                "product_id": product.product_id,
-                "name": product.name,
-                "description": product.description,
-                "price": product.price,
-                "images": [image.file for image in product.productimage_set.all()] if product.productimage_set.exists() else []
-            }
-            for product in recommended_products
-        ]
-
-        return Response(serialized_data)
-
-    except ValueError:
-        return Response({"error": "Invalid parameter values"}, status=400)
-    except Exception as e:
-        return Response({"error": str(e)}, status=400)
+        # Trả về trạng thái và kết quả
+        response = {
+            "task_id": task_id,
+            "status": result.status,
+            "result": result.result if result.status == "SUCCESS" else None,
+        }
+        return Response(response)

@@ -23,7 +23,7 @@ class ShopCartSerializer(serializers.Serializer):
 
 class CartSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = Cart
         fields = ['user', 'items']
@@ -32,16 +32,22 @@ class CartSerializer(serializers.ModelSerializer):
         cart_items = obj.cartitem_set.all()
         shop_dict = {}
         for item in cart_items:
-            shop_name = item.product.shop.shop_name
+            shop = item.product.shop
+            shop_name = shop.shop_name
+            shop_id = shop.shop_id
             if shop_name not in shop_dict:
-                shop_dict[shop_name] = []
-            shop_dict[shop_name].append(item)
+                shop_dict[shop_name] = {
+                    'shop_id': shop_id,
+                    'items': []
+                }
+            shop_dict[shop_name]['items'].append(item)
         
         shop_carts = []
-        for shop_name, items in shop_dict.items():
-            shop_carts.append({
+        for shop_name, shop_data in shop_dict.items():
+            shop_carts.append({                
                 'shop_name': shop_name,
-                'items': CartItemSerializer(items, many=True).data
+                'shop_id': shop_data['shop_id'],
+                'items': CartItemSerializer(shop_data['items'], many=True).data
             })
         
         return shop_carts

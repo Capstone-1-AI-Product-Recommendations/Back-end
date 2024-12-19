@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from web_backend.models import Order, OrderItem, User, Payment, ShippingAddress, UserBankAccount
+from web_backend.models import Order, OrderItem, User, Payment, ShippingAddress, UserBankAccount, CartItem
 from django.conf import settings
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
@@ -16,6 +16,12 @@ from web_backend.utils import transfer_funds
 from datetime import datetime
 import urllib.parse 
 from django.utils import timezone
+import qrcode
+import base64
+from io import BytesIO
+from django.http import HttpResponse
+import uuid
+
 
 # Khởi tạo đối tượng PayOS
 payOS = PayOS(
@@ -32,19 +38,19 @@ def calculate_checksum(data, checksum_key):
 
 @api_view(['GET', 'POST'])
 def payos(request, user_id, order_id):
-    # Lọc đơn hàng với user_id và order_id
+    print(request.data)
     order = Order.objects.filter(
         order_id=order_id,
         user_id=user_id
-    ).exclude(
-        status="Canceled"
-    ).filter(
-        status__in=["Pending", "Processing"]
-    ).first()
-
+        ).order_by('-created_at').first()
+    print(order)
+    
+    amount = Decimal(request.data.get('amount', '0'))
+    shipping_address_id = request.data.get('shipping_address_id')
+    
     if order is None:
         return Response({"error": "Order not found or not in valid status."}, status=status.HTTP_404_NOT_FOUND)
-    if request.method == 'GET':
+    if request.method == 'GET':        
         # Trả về thông tin thanh toán nếu yêu cầu là GET
         order_items = OrderItem.objects.filter(order=order)
         items = []
@@ -54,9 +60,10 @@ def payos(request, user_id, order_id):
                 "quantity": item.quantity,
                 "price": str(item.price)
             })
+        
         return Response({
             "order_id": order.order_id,
-            "total": str(order.total),
+            "total": amount,
             "status": order.status,
             "created_at": order.created_at,
             "updated_at": order.updated_at,
@@ -81,6 +88,11 @@ def payos(request, user_id, order_id):
             cancelUrl="http://localhost:8000/cancel",  # URL khi thanh toán bị hủy
             returnUrl="http://localhost:8000/return"  # URL khi thanh toán thành công
         )
+        
+        existing_payment = Payment.objects.filter(order=order).first()
+        if existing_payment:
+            return Response({"error": "Đơn thanh toán đã tồn tại"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Khởi tạo đối tượng PayOS
         try:
             payos = PayOS(
@@ -91,7 +103,7 @@ def payos(request, user_id, order_id):
             # Tạo liên kết thanh toán
             payment_link = payos.createPaymentLink(paymentData=payment_data)
             payment = Payment.objects.create(
-                amount=order.total,
+                amount=order.total,                                        
                 status="Pending",  # Ban đầu trạng thái sẽ là Pending
                 payment_method="PayOS",  # Phương thức thanh toán (ví dụ)
                 transaction_id=None,  # Ghi sau khi thanh toán hoàn thành
@@ -100,6 +112,7 @@ def payos(request, user_id, order_id):
                 order=order,
                 user=order.user
             )
+            print(payment)
 
             # Trả về URL thanh toán cho người dùng
             return Response({
@@ -107,73 +120,76 @@ def payos(request, user_id, order_id):
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Payment processing failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-        
-@api_view(['GET', 'POST'])
+
+@api_view(['POST'])
 def payment_cod(request, user_id, order_id):
-    # Kiểm tra xem user_id và order_id có hợp lệ không
-    user = get_object_or_404(User, user_id=user_id)
-    order = get_object_or_404(Order, order_id=order_id, user=user)
+    try:
+        # Get user and order
+        user = get_object_or_404(User, user_id=user_id)
+        order = get_object_or_404(Order, order_id=order_id, user=user)
 
-    # Lấy thông tin Shipping Address của người nhận
-    shipping_address = get_object_or_404(ShippingAddress, user=user)
+        # Get shipping address from request
+        shipping_address_id = request.data.get('shipping_address_id')
+        shipping_address = get_object_or_404(ShippingAddress, id=shipping_address_id, user=user)
 
-    # Lấy thông tin các món hàng trong order
-    order_items = OrderItem.objects.filter(order=order)
-    total_amount = Decimal(0)
+        # Get amount from request
+        total_amount = Decimal(request.data.get('amount', '0'))
 
-    # Tạo danh sách các món hàng
-    items_details = []
-    for item in order_items:
-        total_amount += item.price * item.quantity
-        items_details.append({
+        # Get order items for details
+        order_items = OrderItem.objects.filter(order=order)
+        items_details = [{
             "product_name": item.product.name,
             "quantity": item.quantity,
             "price": str(item.price),
             "total_price": str(item.price * item.quantity)
-        })
+        } for item in order_items]
 
-    # Nếu yêu cầu là GET, trả về thông tin đơn hàng
-    if request.method == 'GET':
-        response_data = {
-            "total_amount": str(total_amount),
-            "user_name": user.full_name,
-            "shipping_address": {
-                "recipient_name": shipping_address.recipient_name,
-                "recipient_phone": shipping_address.recipient_phone,
-                "recipient_address": shipping_address.recipient_address
-            },
-            "items": items_details
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
+        if request.method == 'POST':
+            # Generate unique transaction_id
+            timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+            unique_id = str(uuid.uuid4().hex[:6])
+            transaction_id = f"COD-{order.order_id}-{timestamp}-{unique_id}"
 
-    # Nếu yêu cầu là POST, xử lý thanh toán COD
-    elif request.method == 'POST':
-        # Tạo Payment cho đơn hàng, thanh toán COD
-        payment = Payment.objects.create(
-            order=order,
-            user=user,
-            amount=total_amount,
-            status="Pending",
-            payment_method="COD",  # Phương thức thanh toán là COD
-            transaction_id="COD-" + str(order.order_id)  # Mã giao dịch giả cho COD
+            # Create payment record
+            payment = Payment.objects.create(
+                order=order,
+                user=user,
+                amount=total_amount,
+                status="Pending",
+                payment_method="COD",
+                transaction_id=transaction_id
+            )
+
+            # Debug logging
+            print(f"Order items: {[item.product.product_id for item in order_items]}")
+            print(f"User cart items before deletion: {CartItem.objects.filter(cart__user=user).count()}")
+
+            # Remove paid items from the cart
+            CartItem.objects.filter(cart__user=user, product__in=[item.product for item in order_items]).delete()
+
+            # Debug logging
+            print(f"User cart items after deletion: {CartItem.objects.filter(cart__user=user).count()}")
+            print("Xóa sản phẩm khỏi giỏ hàng")
+
+            return Response({
+                "message": "Đơn hàng COD đã được tạo thành công",
+                "payment_id": payment.payment_id,
+                "order_id": order.order_id,
+                "total_amount": str(total_amount),
+                "status": "Pending",
+                "shipping_address": {
+                    "recipient_name": shipping_address.recipient_name,
+                    "recipient_phone": shipping_address.recipient_phone,
+                    "recipient_address": shipping_address.recipient_address
+                }
+            }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return Response(
+            {"error": f"Lỗi xử lý thanh toán COD: {str(e)}"}, 
+            status=status.HTTP_400_BAD_REQUEST
         )
-
-        # Dữ liệu trả về
-        response_data = {
-            "message": "Đơn hàng đang được xử lý",
-            "payment_status": payment.status,
-            "payment_method": payment.payment_method,
-            "total_amount": str(total_amount),
-            "user_name": user.full_name,
-            "shipping_address": {
-                "recipient_name": shipping_address.recipient_name,
-                "recipient_phone": shipping_address.recipient_phone,
-                "recipient_address": shipping_address.recipient_address
-            },
-            "items": items_details
-        }
-        # Serialize dữ liệu và trả về response
-        return Response(response_data, status=status.HTTP_201_CREATED)
     
 @api_view(['GET', 'POST'])
 def process_transfer(request, admin_id, order_id, seller_id):
@@ -323,7 +339,6 @@ def vnpay(request, user_id, order_id):
             transaction_id=vnp.requestData['vnp_TxnRef']
         )
         return Response({'payment_url': payment_url})
-
 
 
 

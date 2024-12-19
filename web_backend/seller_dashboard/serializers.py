@@ -13,16 +13,6 @@ from products.serializers import ProductSerializer, CommentSerializer
 from users.serializers import UserSerializer
 from recommendations.serializers import ProductRecommendationSerializer
 
-# AdView Serializer
-# class AdViewSerializer(serializers.ModelSerializer):
-#     user = UserSerializer()  # Serialize user object as well, if needed
-#     ad = AdSerializer()  # Serialize the Ad object
-#
-#     class Meta:
-#         model = AdView
-#         fields = ['ad_view_id', 'user', 'ad', 'viewed_at']
-#         # Ensure fields match the AdView model
-
 class AdSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ad

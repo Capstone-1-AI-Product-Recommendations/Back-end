@@ -14,12 +14,11 @@ def create_order(request, user_id):
     except User.DoesNotExist:
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    # Lấy cart_item_ids và chuyển chuỗi JSON thành danh sách
-    cart_item_ids_str = request.data.get('cart_item_ids', '[]')  # Mặc định là chuỗi rỗng nếu không có
-    try:
-        cart_item_ids = json.loads(cart_item_ids_str)  # Chuyển chuỗi JSON thành danh sách
-    except json.JSONDecodeError:
-        return Response({"error": "Dữ liệu cart_item_ids không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+    # Get cart_item_ids directly as list
+    cart_item_ids = request.data.get('cart_item_ids', [])
+    
+    if not isinstance(cart_item_ids, list):
+        return Response({"error": "cart_item_ids phải là một mảng."}, status=status.HTTP_400_BAD_REQUEST)
 
     if not cart_item_ids:
         return Response({"error": "Cần phải chọn ít nhất một sản phẩm."}, status=status.HTTP_400_BAD_REQUEST)
@@ -62,22 +61,22 @@ def create_order(request, user_id):
 
     order.total = total_amount
     order.save()
-    cart_items.delete()
+    #cart_items.delete()
 
     # Xử lý thông tin nhận hàng
-    recipient_name = request.data.get('recipient_name', user.full_name) or user.full_name
-    recipient_phone = request.data.get('recipient_phone', user.phone_number) or user.phone_number
-    recipient_address = request.data.get('recipient_address', user.address) or user.address
+    # recipient_name = request.data.get('recipient_name', user.full_name) or user.full_name
+    # recipient_phone = request.data.get('recipient_phone', user.phone_number) or user.phone_number
+    # recipient_address = request.data.get('recipient_address', user.address) or user.address
 
-    # Cập nhật hoặc tạo mới địa chỉ nhận hàng
-    shipping_address, created = ShippingAddress.objects.update_or_create(
-        user=user,
-        defaults={
-            'recipient_name': recipient_name,
-            'recipient_phone': recipient_phone,
-            'recipient_address': recipient_address,
-        }
-    )
+    # # Cập nhật hoặc tạo mới địa chỉ nhận hàng
+    # shipping_address, created = ShippingAddress.objects.update_or_create(
+    #     user=user,
+    #     defaults={
+    #         'recipient_name': recipient_name,
+    #         'recipient_phone': recipient_phone,
+    #         'recipient_address': recipient_address,
+    #     }
+    # )
 
     # Trả về thông tin đơn hàng
     order_serializer = OrderSerializer(order)

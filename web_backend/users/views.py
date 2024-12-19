@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.contrib.auth import logout
-from .serializers import LoginUserSerializer, RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer, UserSerializer
+from .serializers import LoginUserSerializer, RegisUserSerializer, LoginSerializer, RoleSerializer, UserBankAccountSerializer, UserBrowsingBehaviorSerializer, UserSerializer, NotificationSerializer
 from web_backend.models import Role, User, UserBankAccount, UserBrowsingBehavior
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.crypto import get_random_string
@@ -431,52 +431,39 @@ def get_user_behavior(request, user_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response({"detail": "No browsing behavior found for this user."}, status=status.HTTP_404_NOT_FOUND)
 
-# Admin có thể thay đổi role của người dùng thành "seller" hoặc ngược lại.
-# class AdminUserRoleUpdateView(APIView):
-#     permission_classes = [IsAdminUser]
+@api_view(['GET'])
+def get_user_notifications(request, user_id):
+    try:
+        # Get top 10 notifications for the user
+        notifications = Notification.objects.filter(user_id=user_id).order_by('-created_at')[:10]
+        
+        # Serialize notifications
+        serialized_data = NotificationSerializer(notifications, many=True).data
+        
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-#     def put(self, request, user_id):
-#         try:
-#             # Tìm người dùng cần cập nhật
-#             user = User.objects.get(user_id=user_id)
-#             # Kiểm tra Role
-#             role_id = request.data.get('role_id')
+@api_view(['PUT'])
+def update_notification_status(request, user_id):
+    try:
+        # Get notification_id from request data
+        notification_id = request.data.get('notification_id')
 
-#             if not role_id:
-#                 return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-#             # Tìm kiếm Role
-#             try:
-#                 role = Role.objects.get(role_id=role_id)
-#             except Role.DoesNotExist:
-#                 return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
-#             # Cập nhật vai trò người dùng
-#             user.role = role
-#             user.save()
-#             return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+        if notification_id is None:
+            return Response({"error": "notification_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-#         except User.DoesNotExist:
-#             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-# class AdminUserRoleUpdateView(APIView):
-#     permission_classes = [IsAdminUser]  # Only admin can access this view
-    # def put(self, request, user_id):
-    #     try:
-    #         # Retrieve the user by user_id
-    #         user = User.objects.get(user_id=user_id)
-    #     except User.DoesNotExist:
-    #         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    #     # Get role_id from the request data
-    #     role_id = request.data.get('role_id')
-    #     if not role_id:
-    #         return Response({'error': 'Role ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    #     # Retrieve the role by role_id
-    #     try:
-    #         role = Role.objects.get(role_id=role_id)
-    #     except Role.DoesNotExist:
-    #         return Response({'error': 'Invalid Role ID'}, status=status.HTTP_404_NOT_FOUND)
-
-    #     # Update the user's role
-    #     user.role = role
-    #     user.save()
-    #     return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+        # Get the notification
+        notification = Notification.objects.get(notification_id=notification_id, user_id=user_id)
+        
+        # Update is_read status to 0
+        notification.is_read = 0
+        notification.save()
+        
+        return Response({"message": "Notification status updated successfully"}, status=status.HTTP_200_OK)
+    
+    except Notification.DoesNotExist:
+        return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

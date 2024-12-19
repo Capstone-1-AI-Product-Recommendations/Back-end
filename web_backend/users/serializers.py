@@ -63,3 +63,8 @@ class LoginUserSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = UserBankAccount
 #         fields = ['account_id', 'account_number', 'bank_name', 'user_id']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['notification_id', 'message', 'is_read', 'created_at']

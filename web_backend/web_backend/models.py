@@ -7,20 +7,9 @@
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
 from django.db.models import Avg
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
-# class Ad(models.Model):
-#     ad_id = models.AutoField(primary_key=True)
-#     title = models.CharField(max_length=255)
-#     description = models.TextField(blank=True, null=True)
-#     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-#     start_date = models.DateField()
-#     end_date = models.DateField()
-#     created_at = models.DateTimeField(blank=True, null=True)
-#     updated_at = models.DateTimeField(blank=True, null=True)
-
-#     class Meta:
-#         managed = False
-#         db_table = 'ad'
 
 class Ad(models.Model):
     ad_id = models.AutoField(primary_key=True)
@@ -220,17 +209,14 @@ class Product(models.Model):
         # Lưu lại chiến lược đã cập nhật
         self.save()
 
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
-
 @receiver(pre_save, sender=Product)
 def update_is_featured(sender, instance, **kwargs):
-    # Kiểm tra các tiêu chí: có giá khuyến mãi, thuộc sự kiện, hoặc được quảng cáo
-    if instance.promotion_price or instance.event_id or instance.ads.exists():
+    # Kiểm tra các tiêu chí: có giá khuyến mãi hoặc được quảng cáo
+    if instance.promotion_price or instance.ads.exists():
         instance.is_featured = True
     else:
         instance.is_featured = False
-
+        
 class ProductAd(models.Model):
     product_ad_id = models.AutoField(primary_key=True)
     ad = models.ForeignKey('Ad', models.DO_NOTHING)

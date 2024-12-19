@@ -19,9 +19,64 @@ import random
 from django.db.models import Q
 from django.urls import reverse
 from django.db.models import Sum, Avg, F
-from recommendations.views import get_recommended_products
+# from recommendations.views import get_recommended_products
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import Count, F, Sum
+from django.db.models.functions import Coalesce
+from django.db.models import Value, IntegerField, Case, When
 
+
+@api_view(['GET'])
+def get_random_relevant_products(request):
+    user_id = request.query_params.get('user_id')  # Lấy user_id từ query parameter
+    if not user_id:
+        return Response({"error": "Missing user_id"}, status=400)
+
+    # Lấy các sản phẩm liên quan từ UserBrowsingBehavior
+    user_behaviors = UserBrowsingBehavior.objects.filter(user_id=user_id)
+    if not user_behaviors.exists():
+        return Response([])  # Trả về danh sách rỗng nếu không có hành vi người dùng
+
+    # Lấy danh sách các sản phẩm đã tương tác
+    interacted_product_ids = user_behaviors.values_list('product_id', flat=True)
+
+    # Lấy danh sách các danh mục liên quan từ các sản phẩm đã tương tác
+    related_categories = Product.objects.filter(
+        product_id__in=interacted_product_ids
+    ).values_list('subcategory_id', flat=True)
+
+    # Lấy sản phẩm liên quan (trong cùng danh mục hoặc sản phẩm đã tương tác)
+    related_products = Product.objects.filter(
+        Q(subcategory_id__in=related_categories) | Q(product_id__in=interacted_product_ids)
+    ).exclude(product_id__in=interacted_product_ids)  # Loại trừ sản phẩm đã tương tác
+
+    if not related_products.exists():
+        return Response([])  # Trả về danh sách rỗng nếu không có sản phẩm liên quan
+
+    # Random lấy tối đa 28 sản phẩm từ các sản phẩm liên quan
+    random_products = random.sample(list(related_products), min(28, related_products.count()))
+
+    # Tối ưu hóa việc truy xuất hình ảnh (nếu có model ProductImage)
+    random_products = Product.objects.filter(product_id__in=[p.product_id for p in random_products]).prefetch_related('productimage_set')
+
+    # Chuẩn bị dữ liệu JSON trả về
+    serialized_data = [
+        {
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": re.sub(
+                r'(\n\s*)+', '\n',
+                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
+            ).strip(),
+            "price": product.price,
+            "rating": product.rating,
+            "sales_strategy": product.sales_strategy,
+            "images": [image.file for image in product.productimage_set.all()]
+        }
+        for product in random_products
+    ]
+
+    return Response(serialized_data)
 
 # API to retrieve product details by product ID
 @api_view(['GET'])
@@ -42,9 +97,6 @@ def product_detail(request, product_id):
         .replace("\\n", "\n")
         .strip()
     )
-
-
-
     
     # Serialize product data
     serializer = DetailProductSerializer(product)
@@ -56,6 +108,25 @@ def product_detail(request, product_id):
     data['detail_product'] = product.detail_product
 
     return Response(data)
+
+@api_view(['GET'])
+def get_product_comments(request, product_id):
+    try:
+        # Get the product
+        product = Product.objects.get(product_id=product_id)
+        
+        # Get comments for the product
+        comments = Comment.objects.filter(product=product)
+        
+        # Serialize comments
+        serialized_data = CommentSerializer(comments, many=True).data
+        
+        return Response(serialized_data, status=status.HTTP_200_OK)
+    
+    except Product.DoesNotExist:
+        return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # API to create a new product
 @api_view(['POST'])
@@ -190,19 +261,16 @@ import re
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
-    featured_products = Product.objects.filter(is_featured=True).prefetch_related('productimage_set')[:6]
+    featured_products = Product.objects.filter(is_featured=True).prefetch_related('images', 'productad_set__ad')[:8]
     serialized_data = [
         {
             "product_id": product.product_id,
             "name": product.name,
-            "description": re.sub(
-                r'(\n\s*)+', '\n',
-                str(product.description or "").replace('__NEWLINE__', '\n').replace('\\n', '\n')
-            ).strip(),
             "price": product.price,
             "rating": product.computed_rating,
             "sales_strategy": product.sales_strategy,
-            "images": [image.file for image in product.productimage_set.all()]
+            "discount_percentage": product.productad_set.first().ad.discount_percentage if product.productad_set.exists() else None,
+            "images": [image.file for image in product.images.all()]
         }
         for product in featured_products
     ]
@@ -222,7 +290,7 @@ def get_trending_products(request):
             F('total_cart_adds') * 0.2 +
             F('rating') * 0.1
         )
-    ).order_by('-trending_score').prefetch_related('images')[:12]  # Thay đổi từ 'productimage_set' thành 'images'
+    ).order_by('-trending_score').prefetch_related('images', 'productad_set__ad')[:12]
 
     serialized_data = [
         {
@@ -230,8 +298,10 @@ def get_trending_products(request):
             "name": product.name,
             "price": product.price,
             "trending_score": product.trending_score,
+            "rating": product.rating,
+            "discount_percentage": product.productad_set.first().ad.discount_percentage if product.productad_set.exists() else None,
             "altImages": [
-                image.file for image in product.images.all()  # Sử dụng 'images' thay cho 'productimage_set'
+                image.file for image in product.images.all()
             ]
         }
         for product in trending_products
@@ -287,6 +357,74 @@ def get_all_categories(request):
     serialized_data = CategorySerializer(all_categories, many=True).data
     return Response(serialized_data)
 
+@api_view(['GET'])
+def get_top_subcategories(request):
+    try:
+        # Get top 5 subcategories based on product sales
+        top_subcategories = Subcategory.objects.annotate(
+            total_sales=Coalesce(
+                Sum('product__sales_strategy'),
+                0
+            ),
+            product_count=Count('product')
+        ).filter(
+            product__sales_strategy__gt=0  # Only include subcategories with sales
+        ).order_by(
+            '-total_sales'
+        )[:5]
+
+        # Prepare response data
+        serialized_data = [{
+            'subcategory_id': subcategory.subcategory_id,
+            'subcategory_name': subcategory.subcategory_name,
+            'total_sales': subcategory.total_sales,
+            'product_count': subcategory.product_count,
+            'category_name': subcategory.category.category_name if subcategory.category else None
+        } for subcategory in top_subcategories]
+
+        return Response(serialized_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"Error fetching top subcategories: {str(e)}"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_categories_subcategory(request):
+    # Get categories with their subcategories, ordered by total sales_strategy
+    top_categories = Category.objects.annotate(
+        total_sales=Coalesce(
+            Sum('subcategory__product__sales_strategy'),
+            0
+        )
+    ).order_by('-total_sales')[:9]
+
+    serialized_data = []
+    for category in top_categories:
+        # Get subcategories for each category, ordered by sales
+        subcategories = category.subcategory_set.annotate(
+            total_sales=Coalesce(
+                Sum('product__sales_strategy'),
+                0
+            )
+        ).order_by('-total_sales')
+
+        category_data = {
+            'category_id': category.category_id,
+            'category_name': category.category_name,
+            'total_sales': category.total_sales,
+            'subcategories': [{
+                'subcategory_id': sub.subcategory_id,
+                'subcategory_name': sub.subcategory_name,
+                'total_sales': sub.total_sales
+            } for sub in subcategories]
+        }
+        serialized_data.append(category_data)
+
+    return Response(serialized_data)
+
+
 # API to get the latest comments (Top 3 latest comments)
 @api_view(['GET'])
 def get_latest_comments(request):
@@ -335,6 +473,39 @@ def filter_by_category(request):
         return Response(serialized_data, status=200)
     return Response({"message": "Category parameter is required"}, status=400)
 
+@api_view(['GET'])
+def filter_by_subcategory(request):
+    try:
+        # Get subcategory names from query params
+        subcategories = request.GET.getlist('subcategory', [])
+        
+        if not subcategories:
+            return Response({
+                "message": "Subcategory parameter is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create query for multiple subcategories
+        query = Q()
+        for subcategory in subcategories:
+            query |= Q(subcategory__subcategory_name__iexact=subcategory)
+
+        # Get products matching any of the subcategories
+        products = Product.objects.filter(query).select_related(
+            'subcategory', 
+            'shop'
+        ).prefetch_related('images')
+
+        serialized_data = ProductSerializer(products, many=True).data
+        
+        return Response({
+            "products": serialized_data,
+            "total_count": len(serialized_data)
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Bộ lọc theo price
 @api_view(['GET'])
@@ -377,7 +548,7 @@ def filter_by_brand(request):
     return Response({"message": "Brand parameter is required"}, status=400)
 
 
-# Bộ lọc theo stock status
+# Bộ lọc theo tình trạng kho
 @api_view(['GET'])
 def filter_by_stock_status(request):
     stock_status = request.GET.get('stock_status')
@@ -393,113 +564,187 @@ def filter_by_stock_status(request):
         return Response(serialized_data, status=200)
     return Response({"message": "stock_status parameter is required"}, status=400)
 
-# Tổng hợp API cho Filter_Page với các bộ lọc
 @api_view(['GET'])
 def filter_page(request):
-    products = Product.objects.all()
-    print(f"Initial count: {products.count()}")  # Debug log
+    try:
+        # Bắt đầu với tất cả sản phẩm
+        base_products = Product.objects.all()
 
-    # Tìm kiếm theo từ khóa
-    search_term = request.GET.get('search_term', '').strip()
-    if search_term:
-        products = products.filter(
-            Q(name__icontains=search_term) |
-            Q(description__icontains=search_term)
-        )
-        print(f"After search: {products.count()}")  # Debug log
+        # Tìm kiếm theo từ khóa (search_term)
+        search_term = request.GET.get('search_term', '').strip()
+        search_results = []  # Sản phẩm từ `search_term`
 
-    # Bộ lọc theo category
-    category = request.GET.get('category', '').strip()
-    if category:
-        products = products.filter(subcategory__category__category_name__iexact=category)
-        print(f"After category: {products.count()}")  # Debug log
+        if search_term:
+            # Tìm kiếm chính xác
+            regex_pattern = rf'\b{search_term}\b'
+            exact_results = list(base_products.filter(name__iregex=regex_pattern))
+            random.shuffle(exact_results)  # Random hóa kết quả chính xác
 
-    # Bộ lọc theo price
-    min_price = request.GET.get('min_price')
-    max_price = request.GET.get('max_price')
-    if min_price and max_price:
-        try:
-            min_price = float(min_price)
-            max_price = float(max_price)
-            products = products.filter(price__gte=min_price, price__lte=max_price)
-            print(f"After price: {products.count()}")  # Debug log
-        except ValueError:
-            pass
+            # Tìm kiếm gần đúng (loại bỏ các sản phẩm đã có trong kết quả chính xác)
+            partial_results = list(
+                base_products.filter(name__icontains=search_term)
+                .exclude(product_id__in=[p.product_id for p in exact_results])
+            )
+            random.shuffle(partial_results)  # Random hóa kết quả gần đúng
 
-    # Bộ lọc theo color
-    color = request.GET.get('color', '').strip()
-    if color:
-        products = products.filter(color__iexact=color)
-        print(f"After color: {products.count()}")  # Debug log
+            # Gộp kết quả chính xác và gần đúng
+            search_results = exact_results + partial_results
 
-    # Bộ lọc theo brand
-    brand = request.GET.get('brand', '').strip()
-    if brand:
-        products = products.filter(brand__iexact=brand)
-        print(f"After brand: {products.count()}")  # Debug log
+        # Lọc theo subcategory (nhiều giá trị)
+        subcategories = request.GET.getlist('subcategory', [])
+        subcategory_results = []
+        for subcategory in subcategories:
+            subcategory_products = base_products.filter(subcategory__subcategory_name=subcategory)
+            subcategory_results.extend(list(subcategory_products))
 
-    # Bộ lọc theo stock status
-    stock_status = request.GET.get('stock_status', '').strip()
-    if stock_status:
-        if stock_status == 'in_stock':
-            products = products.filter(quantity__gt=0)
-        elif stock_status == 'out_of_stock':
-            products = products.filter(quantity=0)
-        print(f"After stock: {products.count()}")  # Debug log
+        random.shuffle(subcategory_results)  # Random hóa kết quả theo subcategory
 
-    # Bộ lọc theo city và province
-    city = request.GET.get('city', '').strip()
-    province = request.GET.get('province', '').strip()
-    if city:
-        products = products.filter(shop__user__city__icontains=city)
-        print(f"After city: {products.count()}")  # Debug log
-    if province:
-        products = products.filter(shop__user__province__icontains=province)
-        print(f"After province: {products.count()}")  # Debug log
+        # Kết hợp kết quả từ `search_term` và `subcategory`
+        combined_results = search_results + [
+            product for product in subcategory_results if product not in search_results
+        ]
 
-    # Serialize sản phẩm
-    products_serialized = ProductSerializer(products, many=True).data
+        # Lọc theo price
+        min_price = request.GET.get('min_price')
+        max_price = request.GET.get('max_price')
+        if min_price or max_price:
+            try:
+                if min_price:
+                    combined_results = [
+                        product for product in combined_results if product.price >= float(min_price)
+                    ]
+                if max_price:
+                    combined_results = [
+                        product for product in combined_results if product.price <= float(max_price)
+                    ]
+            except ValueError:
+                return Response({
+                    "error": "Invalid price filter values"
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-    # Lọc shop liên quan
-    related_shop_ids = products.values_list('shop_id', flat=True).distinct()
-    sellers = User.objects.filter(
-        shop__shop_id__in=related_shop_ids,
-        role__role_name='Seller'
-    )[:2]
-    sellers_serialized = UserSerializer(sellers, many=True).data
+        # Lọc theo rating
+        rating = request.GET.get('rating')
+        if rating:
+            try:
+                rating = float(rating)
+                combined_results = [
+                    product for product in combined_results if product.rating and product.rating >= rating
+                ]
+            except ValueError:
+                return Response({
+                    "error": "Invalid rating filter value"
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({
-        "products": products_serialized,
-        "top_sellers": sellers_serialized,
-        "total_count": len(products_serialized)  # Thêm số lượng sản phẩm vào response
-    }, status=200)
+        # Lọc theo city
+        cities = request.GET.getlist('city', [])
+        if cities:
+            combined_results = [
+                product for product in combined_results
+                if product.shop and product.shop.user.city in cities
+            ]
+
+        # Giới hạn kết quả trả về 100 sản phẩm
+        combined_results = combined_results[:100]
+
+        # Serialize kết quả
+        products_serialized = [
+            {
+                "product_id": product.product_id,
+                "name": product.name,
+                "description": product.description,
+                "price": product.price,
+                "quantity": product.quantity,
+                "rating": product.rating,
+                "stock_status": "in_stock" if product.quantity > 0 else "out_of_stock",
+                "subcategory": {
+                    "subcategory_id": product.subcategory.subcategory_id if product.subcategory else None,
+                    "subcategory_name": product.subcategory.subcategory_name if product.subcategory else None,
+                    "category_name": product.subcategory.category.category_name if product.subcategory and product.subcategory.category else None,
+                },
+                "sales_strategy": product.sales_strategy,
+                "images": [image.file for image in product.images.all()]
+            }
+            for product in combined_results
+        ]
+
+        return Response({
+            "products": products_serialized,
+            "total_count": len(products_serialized)
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "error": str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 def search_products(request):
     print("Đã vào được ", request.GET)
     search_term = request.GET.get('search_term', '').strip()
-    
+    print("search_term", search_term)
     if not search_term:
         return Response(
             {"error": "Please provide a search term"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Tìm kiếm theo category trước
-    categories = Category.objects.filter(category_name__icontains=search_term)
+    # Bắt đầu với các sản phẩm tìm kiếm chính xác và gần đúng
+    exact_products = Product.objects.none()
+    partial_products = Product.objects.none()
+
+    # Tìm kiếm chính xác trên Category
+    categories = Category.objects.filter(category_name__iexact=search_term)
     if categories.exists():
-        products = Product.objects.filter(subcategory__category__in=categories).prefetch_related('images')
-    else:
-        # Nếu không tìm thấy category, tìm kiếm theo subcategory
-        subcategories = Subcategory.objects.filter(subcategory_name__icontains=search_term)
+        # Nếu tìm thấy Category, lấy Subcategory và tìm Product
+        subcategories = Subcategory.objects.filter(category__in=categories)
         if subcategories.exists():
-            products = Product.objects.filter(subcategory__in=subcategories).prefetch_related('images')
-        else:
-            # Nếu không tìm thấy subcategory, tìm kiếm theo tên sản phẩm
-            products = Product.objects.filter(name__icontains=search_term).prefetch_related('images')
+            # Tìm sản phẩm chính xác trong Subcategory
+            exact_products = Product.objects.filter(
+                subcategory__in=subcategories, name__iexact=search_term
+            )
+        if not exact_products.exists():
+            # Nếu không có sản phẩm chính xác, lấy sản phẩm gần đúng trong Category
+            partial_products = Product.objects.filter(
+                subcategory__category__in=categories, name__icontains=search_term
+            )
+
+    # Nếu không tìm thấy Category
+    if not categories.exists() or not exact_products.exists():
+        # Tìm kiếm chính xác trên Subcategory
+        subcategories = Subcategory.objects.filter(subcategory_name__iexact=search_term)
+        if subcategories.exists():
+            # Tìm sản phẩm chính xác trong Subcategory
+            exact_products = Product.objects.filter(
+                subcategory__in=subcategories, name__iexact=search_term
+            )
+        if not exact_products.exists():
+            # Nếu không có sản phẩm chính xác, lấy sản phẩm gần đúng trong Subcategory
+            partial_products = Product.objects.filter(
+                subcategory__in=subcategories, name__icontains=search_term
+            )
+
+    # Nếu không tìm thấy Subcategory
+    if not subcategories.exists() or not exact_products.exists():
+        # Tìm kiếm chính xác trực tiếp trên Product Name
+        exact_products = Product.objects.filter(name__iexact=search_term)
+        if not exact_products.exists():
+            # Nếu không có sản phẩm chính xác, lấy sản phẩm gần đúng theo Product Name
+            partial_products = Product.objects.filter(name__icontains=search_term)
+
+    # Gộp kết quả: chính xác + gần đúng
+    combined_products = exact_products | partial_products.exclude(product_id__in=exact_products.values_list('product_id', flat=True))
+
+    # Sắp xếp lại sản phẩm có `name` chứa từ khóa lên đầu
+    sorted_results = combined_products.annotate(
+    name_contains_keyword=Case(
+        When(name__iregex=r'\b' + search_term + r'\b', then=Value(1)),  # Đánh dấu nếu `name` chứa từ khóa dưới dạng từ riêng biệt
+        default=Value(0),  # Không đánh dấu nếu không chứa
+        output_field=IntegerField()
+    )
+    ).order_by('-name_contains_keyword', 'name')  # Sắp xếp theo `name_contains_keyword` và `name`
 
     # Nếu không tìm thấy kết quả nào, trả về thông báo
-    if not products.exists():
+    if not sorted_results.exists():
         return Response(
             {
                 "message": "No products found",
@@ -514,18 +759,15 @@ def search_products(request):
         {
             "product_id": product.product_id,
             "name": product.name,
-            # "description": product.description
-            #     .replace('__NEWLINE__', '\n')  # Xử lý '__NEWLINE__' thành xuống dòng
-            #     .replace('\\n', '\n')  # Xử lý chuỗi escape '\\n' thành xuống dòng thực tế
-            #     .strip(),  # Loại bỏ khoảng trắng thừa ở đầu hoặc cuối
             "price": product.price,
-            "rating": product.rating,  # Thêm rating
-            "sales_strategy": product.sales_strategy,  # Thêm sales_strategy
+            "rating": product.rating,
+            "sales_strategy": product.sales_strategy,
             "images": [
                 image.file for image in product.images.all()
-            ]
+            ],
+            "category": product.subcategory.category.category_name if product.subcategory and product.subcategory.category else None,
         }
-        for product in products
+        for product in sorted_results
     ]
 
     return Response({
@@ -533,4 +775,3 @@ def search_products(request):
         "products": serialized_data,
         "total_count": len(serialized_data)
     }, status=status.HTTP_200_OK)
-

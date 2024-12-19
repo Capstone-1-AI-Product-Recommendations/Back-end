@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab  # Add this import
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -60,8 +61,9 @@ INSTALLED_APPS = [
     'orders',
     'payments',
     'recommendations',
-    # 'seller_dashboard',     ?
-    'web_backend.apps.WebBackendConfig',
+    'web_backend',  # Ensure this is listed only once
+    'django_celery_results',
+    'django_celery_beat'
 ]
 
 MIGRATION_MODULES = {
@@ -298,3 +300,34 @@ VNPAY_PAYMENT_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'  # URL 
 VNPAY_RETURN_URL = 'http://example.com/payment_return'
 
 JWT_SECRET_KEY = 'f50d4448422bcde0bdb483cb6f7a0d077f6372653452ad2d7e9ba6deb17373e6'
+
+# Redis URL (cần chạy Redis trên localhost:6379)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Ensure the broker URL is correct
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # Ensure the result backend URL is correct
+
+# Các thiết lập khác (tùy chọn)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_IGNORE_RESULT = False
+CELERY_TASK_RESULT_EXPIRES = 3600  # 1 giờ
+CELERY_BEAT_SCHEDULE = {
+    'generate-recommendations-every-5-minutes': {
+        'task': 'recommendations.tasks.generate_recommendations',
+        'schedule': crontab(minute='*/5'),
+    },
+}
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
+
+# Redis Cache
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://localhost:6379/1',  # Ensure Redis is running on this location
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            # 'SERIALIZER': 'django_redis.serializers.json.JSONSerializer',
+        }
+    }
+}

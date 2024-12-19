@@ -3,7 +3,7 @@ from rest_framework import serializers
 from web_backend.models import Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
 from users.serializers import UserSerializer
 from cloudinary.uploader import upload as cloudinary_upload
-from web_backend.models import Shop, Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory
+from web_backend.models import Shop, Product, ProductRecommendation, ProductAd, Comment, ProductImage, ProductVideo, User, Category, Subcategory, UserBrowsingBehavior
 from users.serializers import UserSerializer
 from cloudinary.uploader import upload as cloudinary_upload
 from cloudinary.uploader import upload
@@ -76,26 +76,21 @@ class ProductAdSerializer(serializers.ModelSerializer):
 
 # Serializer cho Comment
 class CommentSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(source='user.full_name', read_only=True)
+
     class Meta:
         model = Comment
-        fields = [
-            'comment_id',
-            'user',
-            'product',
-            'comment',
-            'rating',
-            'created_at'
-        ]
+        fields = ['comment_id', 'comment', 'rating', 'created_at', 'user', 'full_name']
         
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = '__all__'
 
-# class CommentSerializer(serializers.ModelSerializer):
-#     user = serializers.CharField(source='user.username', read_only=True)
-#     created_at = serializers.DateTimeField(read_only=True)
-
-#     class Meta:
-#         model = Comment
-#         fields = ['user', 'comment', 'rating', 'created_at']
-
+class UserBrowsingBehaviorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBrowsingBehavior
+        fields = '__all__'
 # Serializer for ProductImage model
 class ProductImageSerializer(serializers.ModelSerializer):
     file = serializers.CharField()    
