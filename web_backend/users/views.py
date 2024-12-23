@@ -29,6 +29,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 # from .decorators import admin_required
 # from .models import User, Role
 # from .serializers import UserSerializer
+from django.contrib.auth.models import User as AuthUser
 
 def validate_email_format(value):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
@@ -490,3 +491,146 @@ def get_user_behavior(request, user_id):
     #     user.role = role
     #     user.save()
     #     return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+    
+@api_view(['POST'])
+def register_seller(request, user_id):
+    """
+    Người dùng gửi yêu cầu đăng ký trở thành seller.
+    Lưu thông tin vào bảng Notification với trạng thái 'Đang chờ' và gửi thông báo cho admin.
+    """
+    try:
+        # Kiểm tra user_id hợp lệ
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    store_name = request.data.get('store_name')
+    store_address = request.data.get('store_address')
+    email = request.data.get('email')
+    phone_number = request.data.get('phone_number')
+
+    # Kiểm tra các trường yêu cầu
+    if not store_name or not store_address or not email or not phone_number:
+        return Response(
+            {"error": "Tất cả các trường 'store_name', 'store_address', 'email', 'phone_number' đều bắt buộc."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Kiểm tra xem người dùng đã có phải là seller chưa
+    if user.role.role_name == "Seller":
+        return Response({"error": "User is already a seller."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Lưu thông tin tạm thời vào seller_profile
+    seller_profile = SellerProfile.objects.create(
+        user=user,
+        store_name=store_name,
+        store_address=store_address
+    )
+    seller_profile.save()
+
+    # Cập nhật thông tin email và phone_number vào bảng user (tạm thời)
+    user.email = email
+    user.phone_number = phone_number
+    user.save()
+
+    # Tạo thông báo cho admin (trạng thái 'Đang chờ' với is_read = 1)
+    try:
+    # Lấy tất cả admin từ bảng User
+        admin_users = User.objects.filter(role__role_name="Admin")
+        if not admin_users:
+            return Response({"error": "No admin users found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Tạo thông báo cho tất cả admin
+        for admin_user in admin_users:
+            notification = Notification.objects.create(
+                message=f"Người dùng {user.username} (ID: {user.user_id}) đã đăng ký trở thành seller.",
+                is_read=1,  # 'Đang chờ'
+                user=admin_user  # Gán admin vào người nhận thông báo, không phải user đang đăng ký
+            )
+
+        return Response(
+            {"message": "Đăng ký trở thành seller đã được ghi nhận. Đang chờ phê duyệt."},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response({"error": f"Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def accept_or_reject_seller(request, admin_id):
+    """
+    API cho phép admin xác nhận hoặc từ chối yêu cầu đăng ký seller của người dùng.
+    """
+    try:
+        # Lấy thông tin admin từ admin_id
+        admin = User.objects.get(user_id=admin_id)
+        if not admin.role or admin.role.role_name != "Admin":
+            return Response({"detail": "Chỉ admin mới có thể thực hiện thao tác này."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"error": "Admin không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy thông báo notification_id từ request
+    notification_id = request.data.get('notification_id')  # Lấy ID thông báo
+    if not notification_id:
+        return Response({"error": "Không có notification_id trong yêu cầu."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Lấy thông báo từ Notification
+        notification = Notification.objects.get(notification_id=notification_id, is_read=1)
+    except Notification.DoesNotExist:
+        return Response({"error": "Không tìm thấy yêu cầu đăng ký seller của người dùng."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Phân tích user_id từ message trong thông báo (mã regex kiểm tra đúng định dạng)
+    user_id_match = re.search(r'Người dùng .* \(ID: (\d+)\)', notification.message)
+    if not user_id_match:
+        return Response({"error": "Không thể tìm thấy user_id trong thông báo."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Lấy user_id từ thông báo
+    user_id = int(user_id_match.group(1))
+
+    # Kiểm tra user_id và tồn tại của user
+    try:
+        user = User.objects.get(user_id=user_id)
+        if user.role and user.role.role_name == "Seller":
+            return Response({"detail": f"Người dùng {user.username} đã là seller."}, status=status.HTTP_400_BAD_REQUEST)
+    except User.DoesNotExist:
+        return Response({"error": "User không tìm thấy."}, status=status.HTTP_404_NOT_FOUND)
+
+    action = request.data.get('action')  # 'approve' hoặc 'reject'
+    if action == 'approve':
+        notification.is_read = 0  # Đánh dấu đã duyệt
+        message = f"{user.username} đã được duyệt trở thành seller."
+
+        # Gán role Seller nếu chưa có
+        try:
+            seller_role = Role.objects.get(role_name="Seller")
+        except Role.DoesNotExist:
+            return Response({"error": "Role 'Seller' không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.role = seller_role
+        user.save()
+
+        # Tạo thông báo cho user về kết quả xác nhận
+        user_notification_message = f"Chúc mừng! Tài khoản của bạn đã được xác nhận là seller."
+        Notification.objects.create(
+            message=user_notification_message,
+            is_read=1,  # Đang chờ
+            user=user  # Thông báo này dành cho người dùng
+        )
+
+    elif action == 'reject':
+        notification.is_read = 2  # Đánh dấu đã từ chối
+        message = f"{user.username} đã bị từ chối yêu cầu trở thành seller."
+
+        # Tạo thông báo cho user về kết quả từ chối
+        user_notification_message = f"Rất tiếc, yêu cầu đăng ký seller của bạn đã bị từ chối."
+        Notification.objects.create(
+            message=user_notification_message,
+            is_read=1,  # Đang chờ
+            user=user  # Thông báo này dành cho người dùng
+        )
+    else:
+        return Response({"error": "Hành động không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
+    notification.save()
+    return Response({"message": message}, status=status.HTTP_200_OK)

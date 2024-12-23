@@ -226,7 +226,7 @@ class ProductVideo(models.Model):
 
 
 class SellerProfile(models.Model):
-    seller_id = models.CharField(primary_key=True, max_length=50)
+    seller_id = models.AutoField(primary_key=True)
     store_name = models.CharField(max_length=255, blank=True, null=True)
     store_address = models.TextField(blank=True, null=True)
     user = models.OneToOneField(User, models.DO_NOTHING)
