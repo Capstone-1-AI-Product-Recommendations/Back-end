@@ -1,3 +1,5 @@
+import csv
+from itertools import count
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -6,28 +8,87 @@ from web_backend.models import *
 from .serializers import ShopInfoSerializer, ShopSerializer, ProductSerializer, SellOrderSerializer, SellOrderItemSerializer, AdSerializer, ProductAdSerializer, NotificationSerializer, CommentSerializer, ProductRecommendationSerializer
 # seller_dashboard/views.py
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from rest_framework import status
-from datetime import date
+from datetime import date, timedelta
+import openpyxl
 from users.decorators import seller_required
-# from .serializers import AdSerializer, ProductSerializer, 
-# from .models import Ad, ProductAd
-# from products.models import Product
+from django.db.models import F, Case, When, Value, Sum, Count
+from django.db.models.functions import Greatest
+from datetime import datetime, timedelta
+from django.db.models.functions import TruncDay, ExtractWeek, ExtractMonth
+
+@api_view(['GET'])
+def get_seller_products(request, seller_id):
+    try:
+        seller = User.objects.get(user_id=seller_id)
+        # Kiểm tra seller_id hợp lệ
+        if not seller.role or seller.role.role_name != "seller":
+            return Response({"detail": "Only sellers can view their products."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy các sản phẩm của shop
+    try:
+        # seller = User.objects.get(user_id=seller_id)        
+        shop = Shop.objects.get(user=seller)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found for this seller."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy các sản phẩm của shop
+    products = Product.objects.filter(shop=shop).annotate(
+        recent_date=Case(
+            When(updated_at__gt=F('created_at'), then=F('updated_at')),
+            default=F('created_at')
+        )
+    ).values('product_id', 'name', 'price', 'quantity', 'recent_date')
+
+    # Lấy URL hình ảnh của từng sản phẩm
+    product_data = []
+    for product in products:
+        images = ProductImage.objects.filter(product_id=product['product_id']).values_list('file', flat=True)
+        product['images'] = list(images)
+        product_data.append(product)
+
+    return Response(product_data, status=status.HTTP_200_OK)
 
 
 # Quản lý đơn hàng
 @api_view(['GET'])
 def get_orders(request, seller_id):
-    try:
-        # Kiểm tra seller_id hợp lệ
-        seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
-            return Response({"detail": "Only sellers can view orders."}, status=status.HTTP_403_FORBIDDEN)
-    except User.DoesNotExist:
-        return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+    # try:
+    #     # Kiểm tra seller_id hợp lệ
+    #     seller = User.objects.get(user_id=seller_id)
+    #     if not seller.role or seller.role.role_name != "seller":
+    #         return Response({"detail": "Only sellers can view orders."}, status=status.HTTP_403_FORBIDDEN)
+    # except User.DoesNotExist:
+    #     return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+    seller = User.objects.get(user_id=seller_id)
+
+    # Lấy các đơn hàng của seller
     orders = Order.objects.filter(orderitem__product__shop__user=seller).distinct()
-    serializer = SellOrderSerializer(orders, many=True)
-    return Response(serializer.data)
+
+    # Chuẩn bị dữ liệu đơn hàng
+    order_data = []
+    for order in orders:
+        order_items = OrderItem.objects.filter(order=order)
+        for item in order_items:
+            product = item.product
+            images = ProductImage.objects.filter(product=product).values_list('file', flat=True)
+            recent_date = max(order.created_at, order.updated_at)
+            payment = Payment.objects.filter(order=order).first()
+
+            order_data.append({
+                'full_name': order.user.full_name,
+                'product_name': product.name,
+                'images': list(images),
+                'recent_date': recent_date,
+                'payment_method': payment.payment_method if payment else None,
+                'price': item.price,
+                'status': order.status,
+            })
+    return Response(order_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -35,7 +96,7 @@ def get_order_details(request, seller_id, order_id):
     try:
         # Kiểm tra seller_id hợp lệ
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view order details."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -59,7 +120,7 @@ def update_order_status(request, order_item_id, seller_id):
     try:
         # Kiểm tra seller_id hợp lệ
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can update order status."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)    
@@ -97,7 +158,7 @@ def update_order_status(request, order_item_id, seller_id):
             order.save()
             purchased_products = PurchasedProduct.objects.filter(order_id=order.order_id)
             for purchased_product in purchased_products:
-                purchased_product.status = 'Confirmed'  # Hoặc giá trị trạng thái khác tùy vào yêu cầu
+                purchased_product.status = 'Confirmed'  # or giá trị trạng thái khác tùy vào yêu cầu
                 purchased_product.save()
             return Response({"message": "Trạng thái đơn hàng đã được cập nhật thành công."}, status=status.HTTP_200_OK)
     
@@ -161,7 +222,7 @@ def update_shop(request, seller_id, shop_id):
     # Kiểm tra seller_id có phải là một seller hợp lệ không
     try:
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can update their shop."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -187,7 +248,7 @@ def delete_shop(request, seller_id, shop_id):
     # Kiểm tra seller_id có phải là một seller hợp lệ không
     try:
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can delete their shop."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -212,7 +273,7 @@ def delete_shop(request, seller_id, shop_id):
 def get_notifications(request, seller_id):
     try:
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view notifications."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -228,7 +289,7 @@ def get_comments(request, seller_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view comments."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -251,7 +312,7 @@ def get_comments_for_product(request, seller_id, product_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view comments for their products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -273,7 +334,7 @@ def sales_report(request, seller_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view sales report."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -287,14 +348,12 @@ def sales_report(request, seller_id):
     serializer = SellOrderSerializer(orders, many=True)
     return Response(serializer.data)
 
-
-
 @api_view(['GET'])
 def ad_performance(request, seller_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view ad performance."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -313,7 +372,7 @@ def sales_report_for_product(request, seller_id, product_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view sales report for products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -345,7 +404,7 @@ def ad_performance_for_product(request, seller_id, product_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view ad performance for products."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -366,7 +425,7 @@ def get_product_recommendations(request, seller_id):
     try:
         # Kiểm tra xem seller_id có hợp lệ không
         seller = User.objects.get(user_id=seller_id)
-        if not seller.role or seller.role.role_name != "Seller":
+        if not seller.role or seller.role.role_name != "seller":
             return Response({"detail": "Only sellers can view product recommendations."}, status=status.HTTP_403_FORBIDDEN)
     except User.DoesNotExist:
         return Response({"detail": "Seller not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -435,3 +494,120 @@ def get_homepage_banners(request):
         return Response(serialized_ads, status=status.HTTP_200_OK)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def export_orders(request, seller_id):
+    print("Gia trị url:", request.GET)
+
+    # Kiểm tra quyền
+    if request.user.id != int(seller_id):
+        return Response({'error': 'Permission denied'}, status=403)
+
+    # Lấy danh sách đơn hàng với tối ưu truy vấn
+    orders = Order.objects.filter(orderitem__product__shop__user__user_id=seller_id).distinct() \
+        .select_related('user') \
+        .prefetch_related('orderitem_set__product', 'payment_set')
+
+    if not orders.exists():
+        return Response({'error': 'No orders found for this seller'}, status=404)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename=orders.csv'
+    response.write(u'\ufeff'.encode('utf8'))  # UTF-8 BOM for Excel compatibility
+    writer = csv.writer(response)
+    writer.writerow(['Order ID', 'Buyer Name', 'Purchase Date', 'Payment Method', 'Product', 'Quantity', 'Price', 'Status'])
+    for order in orders:
+        payment = order.payment_set.first()
+        for item in order.orderitem_set.all():
+            writer.writerow([
+                order.order_id,
+                order.user.full_name,
+                order.created_at.strftime('%Y-%m-%d'),
+                payment.payment_method if payment else None,
+                item.product.name,
+                item.quantity,
+                item.price,
+                order.status,
+            ])
+
+    return response
+
+@api_view(['GET'])
+def get_sales_summary(request, user_id):
+    try:
+        # Kiểm tra xem user_id có hợp lệ không
+        user = User.objects.get(user_id=user_id)
+        if not user.role or user.role.role_name != "seller":
+            return Response({"detail": "Only sellers can view sales summary."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy tổng doanh thu và tổng đơn hàng
+    orders = Order.objects.filter(orderitem__product__shop__user=user).distinct()
+    total_revenue = orders.aggregate(total_revenue=Sum(F('orderitem__price') * F('orderitem__quantity')))['total_revenue'] or 0
+    total_orders = orders.count()
+
+    # Tính giá trị đơn trung bình
+    average_order_value = total_revenue / total_orders if total_orders > 0 else 0
+
+    return Response({
+        "total_revenue": total_revenue,
+        "total_orders": total_orders,
+        "average_order_value": average_order_value
+    }, status=status.HTTP_200_OK)
+    
+
+from django.db.models.functions import TruncMonth
+
+@api_view(['GET'])
+def get_yearly_sales_summary(request, user_id):
+    try:
+        # Kiểm tra xem user_id có hợp lệ không
+        user = User.objects.get(user_id=user_id)
+        if not user.role or user.role.role_name != "seller":
+            return Response({"detail": "Only sellers can view sales summary."}, status=status.HTTP_403_FORBIDDEN)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy tổng doanh thu và tổng đơn hàng theo tháng
+    orders = Order.objects.filter(orderitem__product__shop__user=user).annotate(month=TruncMonth('created_at')).values('month').annotate(
+        total_revenue=Sum(F('orderitem__price') * F('orderitem__quantity')),
+        total_orders=Count('order_id')
+    ).order_by('month')
+
+    # Chuẩn bị dữ liệu trả về
+    monthly_sales = []
+    for order in orders:
+        month_name = f"T{order['month'].month}"
+        monthly_sales.append({
+            'name': month_name,
+            'sales': order['total_revenue'] or 0,
+            'orders': order['total_orders']
+        })
+
+    return Response({'year': monthly_sales}, status=status.HTTP_200_OK)
+
+from django.db.models import Count
+
+@api_view(['GET'])
+def get_shop_categories(request, shop_id):
+    try:
+        # Kiểm tra xem shop_id có hợp lệ không
+        shop = Shop.objects.get(shop_id=shop_id)
+    except Shop.DoesNotExist:
+        return Response({"detail": "Shop not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Lấy số lượng sản phẩm theo danh mục
+    categories = Category.objects.filter(subcategory__product__shop=shop).annotate(
+        product_count=Count('subcategory__product')
+    ).values('category_name', 'product_count')
+
+    # Chuẩn bị dữ liệu trả về
+    category_data = []
+    for category in categories:
+        category_data.append({
+            'name': category['category_name'],
+            'value': category['product_count']
+        })
+
+    return Response(category_data, status=status.HTTP_200_OK)

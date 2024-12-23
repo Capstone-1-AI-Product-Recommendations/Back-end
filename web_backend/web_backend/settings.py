@@ -63,8 +63,20 @@ INSTALLED_APPS = [
     'recommendations',
     'web_backend',  # Ensure this is listed only once
     'django_celery_results',
-    'django_celery_beat'
+    'django_celery_beat',
+    'channels',
 ]
+
+ASGI_APPLICATION = 'web_backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 MIGRATION_MODULES = {
     # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)

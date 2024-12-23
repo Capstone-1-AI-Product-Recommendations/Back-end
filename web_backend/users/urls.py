@@ -1,8 +1,7 @@
-
 from django.urls import path
 # from .views import AdminUserRoleUpdateView
 from django.urls import path, include
-from .views import new_password, verify_reset_code, login_view, logout_view, register, GoogleSignUpView, GoogleAuthCallback, forgot_password, reset_password, verify_email, update_user, user_bank_accounts_list_create, user_bank_account_detail, get_user_behavior, get_user_notifications, update_notification_status
+from .views import get_user_orders, new_password, verify_reset_code, login_view, logout_view, register, GoogleSignUpView, GoogleAuthCallback, forgot_password, reset_password, verify_email, user_bank_accounts_list_create, user_bank_account_detail, get_user_behavior, get_user_notifications, update_notification_status, get_user_info, update_user_info
 from rest_framework.urlpatterns import format_suffix_patterns
 # from .views import AdminUserRoleUpdateView
 #
@@ -17,18 +16,20 @@ urlpatterns = [
     path('verify_reset_code/', verify_reset_code, name='verify_reset_code'),
     path('new_password/', new_password, name='new_password'),
     path('reset_password/', reset_password, name='reset_password'),
-    path('verify_email/', verify_email, name='verify_email'),
-    path('update_user/<int:user_id>/', update_user, name='update_user'),
+    path('verify_email/', verify_email, name='verify_email'),   
     
     # path('admin/update-user-role/<int:user_id>/', AdminUserRoleUpdateView.as_view(), name='admin-update-user-role'),
-    path('update_user/<int:user_id>/', update_user, name='update_user'),
     path('bank_accounts/user/<int:user_id>/', user_bank_accounts_list_create, name='user_bank_accounts_list_create'),
     path('bank_accounts/user/<int:user_id>/account/<int:bank_account_id>/', user_bank_account_detail, name='user_bank_account_detail'),
     path('user/behavior/<int:user_id>/', get_user_behavior, name='get_user_behavior'),    
-    
     #notifications
     path('user/<int:user_id>/notifications/', get_user_notifications, name='get_user_notifications'),
     path('user/<int:user_id>/notifications/update/', update_notification_status, name='update_notification_status'),
+    
+    #user info
+    path('user/<int:user_id>/info/', get_user_info, name='get_user_info'),
+    path('user/<int:user_id>/info/update/', update_user_info, name='update_user_info'),
+    path('user/<int:user_id>/orders/', get_user_orders, name='get_user_orders'),
 ]
 
 # Apply format suffix patterns (if required for API formats like JSON, XML, etc.)

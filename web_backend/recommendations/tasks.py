@@ -100,12 +100,17 @@ def generate_recommendations(self, user_id):
     # Kết hợp tất cả sản phẩm từ các danh mục khác nhau
     for category, items in results.items():
         for item in items:
+            product = Product.objects.get(product_id=item["product_id"])
+            # Get the most recent discount percentage
+            recent_ad = product.productad_set.order_by('-ad__updated_at', '-ad__created_at').first()
+            discount_percentage = recent_ad.ad.discount_percentage if recent_ad else None
             filtered_results.append({
                 "product_id": item["product_id"],
                 "name": item["name"],
                 "price": item["price"],
                 "rating": item.get("rating"),
                 "sales_strategy": item.get("sales_strategy"),
+                "discount": discount_percentage,  # Get the most recent discount percentage
             })
     # Lưu kết quả vào cache
     cache.set(cache_key, filtered_results, timeout=86400)  # Timeout là 1 ngày

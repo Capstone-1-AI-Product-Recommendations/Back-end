@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models import Avg
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from django.utils.timezone import now
 
 
 class Ad(models.Model):
@@ -374,3 +375,33 @@ class PurchasedProduct(models.Model):
     class Meta:
         managed = False
         db_table = 'purchased_product'
+
+class UserBehavior(models.Model):
+    VIEW = 'view'
+    ADD_TO_CART = 'add_to_cart'
+    PURCHASE = 'purchase'
+    SEARCH = 'search'
+
+    ACTION_TYPE_CHOICES = [
+        (VIEW, 'View'),
+        (ADD_TO_CART, 'Add to Cart'),
+        (PURCHASE, 'Purchase'),
+        (SEARCH, 'Search'),
+    ]
+
+    user_id = models.BigIntegerField(null=True, blank=True)  # user_id BIGINT NULL
+    session_id = models.CharField(max_length=255, null=True, blank=True)  # session_id VARCHAR(255) NULL
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)  # action_type ENUM(...)
+    product_id = models.IntegerField()  # product_id INT NOT NULL
+    quantity = models.IntegerField(default=1)  # quantity INT DEFAULT 1
+    search_query = models.TextField(null=True, blank=True)  # search_query TEXT NULL
+    created_at = models.DateTimeField(default=now)  # created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at = models.DateTimeField(auto_now=True)  # updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+    class Meta:
+        managed = True
+        db_table = 'user_behavior'  # Đặt tên bảng là `user_behavior`
+        unique_together = (('user_id', 'session_id', 'product_id', 'action_type'),)  # Thêm unique_together nếu cần
+
+    def __str__(self):
+        return f"UserBehavior(user_id={self.user_id}, session_id={self.session_id}, action_type={self.action_type})"

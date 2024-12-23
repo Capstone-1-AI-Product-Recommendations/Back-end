@@ -1,23 +1,16 @@
 from django.urls import path
-from .views import delete_shop, update_shop, get_shop_info, get_orders, create_shop, get_order_details, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report, get_comments_for_product, sales_report_for_product, ad_performance_for_product, get_product_recommendations_for_product, update_order_status
+from .views import delete_shop, get_sales_summary, get_shop_categories, get_yearly_sales_summary, update_shop, get_shop_info, get_orders, create_shop, get_order_details, get_comments, get_notifications, get_product_recommendations, ad_performance, sales_report, get_comments_for_product, sales_report_for_product, ad_performance_for_product, get_product_recommendations_for_product, update_order_status, export_orders
 # seller_dashboard/urls.py
 from . import views
 
 urlpatterns = [
+     #Quản lý kho hàng
+    path('seller/<int:seller_id>/products/', views.get_seller_products, name='get_seller_products'),     
+    path('seller/orders/<int:seller_id>/', get_orders, name='get_orders'),
+     
     # Quản lý đơn hàng    
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', views.get_order_details, name='get_order_details'),
 
-    # Quản lý quảng cáo
-#     path('seller/<int:seller_id>/create_ads/<int:product_id>/', views.create_ad, name='create_ad'),
-#     path('seller/<int:seller_id>/update_ads/<int:product_id>/<int:ad_id>/', views.update_ad, name='update_ad'),
-
-#     # Quản lý hồ sơ seller
-#     path('seller/profile/<int:seller_id>/', views.get_seller_profile, name='get_seller_profile'),
-#     path('seller/update_profile/<int:seller_id>/', views.update_seller_profile, name='update_seller_profile'),
-
-
-
-    path('seller/orders/<int:seller_id>/', get_orders, name='get_orders'),
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', get_order_details, name='get_order_details'),
     path('seller/<int:seller_id>/update_status/<int:order_item_id>/', update_order_status, name='update_order_status'),
     path('seller/<int:seller_id>/create_shop/', create_shop, name='create_shop'),
@@ -53,19 +46,8 @@ urlpatterns = [
     path('ads/homepage-banners/', views.get_homepage_banners, name='get_homepage_banners'),  # API quảng cáo homepage
     
      # Quản lý đơn hàng
-    path('seller/orders/<int:seller_id>/', views.get_orders, name='get_orders'),
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', views.get_order_details, name='get_order_details'),
 
-    # Quản lý quảng cáo
-#     path('seller/<int:seller_id>/create_ads/<int:product_id>/', views.create_ad, name='create_ad'),
-#     path('seller/<int:seller_id>/update_ads/<int:product_id>/<int:ad_id>/', views.update_ad, name='update_ad'),
-
-#     # Quản lý hồ sơ seller
-#     path('seller/profile/<int:seller_id>/', views.get_seller_profile, name='get_seller_profile'),
-#     path('seller/update_profile/<int:seller_id>/', views.update_seller_profile, name='update_seller_profile'),
-
-
-    path('seller/orders/<int:seller_id>/', get_orders, name='get_orders'),
     path('seller/<int:seller_id>/orders_details/<int:order_id>/', get_order_details, name='get_order_details'),
     path('seller/<int:seller_id>/update_status/<int:order_item_id>/', update_order_status, name='update_order_status'),
     path('seller/<int:seller_id>/create_shop/', create_shop, name='create_shop'),
@@ -106,4 +88,10 @@ urlpatterns = [
     path('ads/', views.get_ads, name='get_ads'),  # API lấy danh sách quảng cáo
     path('ads/create/', views.create_ad, name='create_ad'),  # API tạo quảng cáo
     path('ads/homepage-banners/', views.get_homepage_banners, name='get_homepage_banners'),  # API quảng cáo homepage
+
+    # Export orders
+    path('seller/<int:seller_id>/export_orders/', export_orders, name='export_orders'),  
+    path('seller/<int:user_id>/sales_summary/', get_sales_summary, name='get_sales_summary'),  
+    path('seller/<int:user_id>/yearly_sales_summary/', get_yearly_sales_summary, name='get_yearly_sales_summary'),
+    path('seller/<int:shop_id>/categories/', get_shop_categories, name='get_shop_categories'),
 ]

@@ -23,6 +23,7 @@ import re, random
 from django.forms import ValidationError 
 from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 # from rest_framework.views import APIView
 # from rest_framework.permissions import IsAdminUser
 # from .decorators import admin_required
@@ -337,14 +338,13 @@ def new_password(request):
 
 @csrf_exempt
 @api_view(['PUT'])
-def update_user(request, user_id):
-
+def update_user_info(request, user_id):
     try:
         # Retrieve the user with the provided user_id
         user = User.objects.get(user_id=user_id)
 
         # Update user fields from request data
-        fields_to_update = ['full_name', 'email', 'phone_number', 'address']
+        fields_to_update = ['full_name', 'email', 'phone_number', 'address', 'city']
         for field in fields_to_update:
             if field in request.data:
                 if field == 'email':  # Kiểm tra email
@@ -362,16 +362,17 @@ def update_user(request, user_id):
         user.save()
 
         # Return the updated user data
+        user_info = {
+            'full_name': user.full_name,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'address': user.address,
+            'city': user.city,
+        }
         return Response(
             {
                 "message": "User information updated successfully.",
-                "updated_data": {
-                    "username": user.username,
-                    "full_name": user.full_name,
-                    "email": user.email,
-                    "phone_number": user.phone_number,
-                    "address": user.address,
-                },
+                "updated_data": user_info,
             },
             status=status.HTTP_200_OK,
         )
@@ -465,5 +466,51 @@ def update_notification_status(request, user_id):
     
     except Notification.DoesNotExist:
         return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def get_user_info(request, user_id):
+    try:
+        user = User.objects.get(pk=user_id)
+        user_info = {
+            'username': user.username,
+            'full_name': user.full_name,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'address': user.address,
+            'city': user.city,
+        }
+        return JsonResponse(user_info, status=200)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+from web_backend.models import Order, OrderItem, Product, Shop, ProductImage
+
+@api_view(['GET'])
+def get_user_orders(request, user_id):
+    try:
+        orders = Order.objects.filter(user_id=user_id)
+        if not orders.exists():
+            return Response({"detail": "No orders found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+        order_data = []
+        for order in orders:
+            order_items = OrderItem.objects.filter(order=order)
+            for item in order_items:
+                product = item.product
+                shop = product.shop
+                product_image = product.images.first().file if product.images.exists() else None
+                order_data.append({
+                    "order_id": order.order_id,
+                    "product_id": product.product_id,
+                    "product_name": product.name,
+                    "quantity": item.quantity,
+                    "status": order.status,
+                    "shop_name": shop.shop_name if shop else None,
+                    "image": product_image,
+                })
+
+        return Response(order_data, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

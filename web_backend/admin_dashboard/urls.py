@@ -2,6 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('admin/products/', views.get_product, name='get_product_details'),
+    path('admin/statistics/', views.get_statistics, name='get_statistics'),
+    path('admin/products/export/', views.export_product, name='export_product'),
+    path('admin/users/export/', views.export_user, name='export_user'),
+    path('admin/orders/export/', views.export_order, name='export_order'),
     # Users
     path('users/', views.get_users, name='get-users'),  # API lấy tất cả người dùng
     path('users/create/', views.create_user, name='create-user'),  # API tạo người dùng mới
@@ -42,7 +47,7 @@ urlpatterns = [
     # Stats
     path('stats/sales/<str:period>/', views.get_sales_data, name='get-sales-data'),  # API Tổng doanh số, lợi nhuận, doanh thu
     path('admin_dashboard/stats/new-customers/<str:period>/', views.get_new_customers_by_period, name='new_customers_by_period'),  # API Khách hàng mới (theo thời gian)
-     path('stats/new-customers/<str:period>/', views.get_new_customers, name='get-new-customers-stats'),
+    path('stats/new-customers/<str:period>/', views.get_new_customers, name='get-new-customers-stats'),
     # Admin Info
     path('admin/info/', views.get_admin_info, name='get-admin-info'),  # API lấy thông tin admin
     path('admin/info/<int:admin_id>/', views.update_admin_info, name='update-admin-info'),  # API chỉnh sửa thông tin admin

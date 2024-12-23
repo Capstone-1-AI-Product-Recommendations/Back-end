@@ -5,43 +5,215 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.http import JsonResponse
 from rest_framework import status
-from django.db.models import Q
+from django.db.models import Q,  Subquery, OuterRef
 from datetime import datetime, timedelta
 from web_backend.models import *
-# from .models import Notification, UserBrowsingBehavior
-# from seller_dashboard.models import Ad
-# from users.models import User, Role
-# from products.models import Category
-# from orders.models import Order, OrderItem
+from django.contrib.auth.hashers import make_password
+
 from django.db.models import Sum
 from django.db.models import F
 from .serializers import NotificationSerializer, UserBrowsingBehaviorSerializer
 from users.serializers import UserSerializer
-from products.serializers import CategorySerializer
+from products.serializers import CategorySerializer, ProductSerializer
 from orders.serializers import OrderSerializer
 from seller_dashboard.serializers import AdSerializer
 from users.decorators import admin_required
-
+from django.core.validators import validate_email
+from django.http import HttpResponse
 from rest_framework.permissions import AllowAny
+# API để lấy danh sách người dùng (GET)
+from django.core.cache import cache
+from django.forms import ValidationError 
+from django.utils.crypto import get_random_string
+from django.utils.timezone import now
+from .serializers import CreateUserSerializer
+import csv
 # API để lấy danh sách người dùng (GET)
 @api_view(['GET'])
 # @admin_required
 @permission_classes([AllowAny])
 def get_users(request):
+    cache_key = 'users_list'
+    cached_users = cache.get(cache_key)
+    
+    if cached_users:
+        return Response(cached_users)
+    
     users = User.objects.all()
     serialized_data = UserSerializer(users, many=True).data
+    cache.set(cache_key, serialized_data, timeout=86400)  # Cache for 1 day (86400 seconds)
     return Response(serialized_data)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def export_product(request):
+    print("Gia trị url:", request.GET)
+
+    # Kiểm tra quyền admin
+    # if not request.user.is_staff:
+    #     return Response({'error': 'Permission denied'}, status=403)
+
+    # Lấy danh sách sản phẩm với tối ưu truy vấn
+    products = Product.objects.all().select_related('shop').prefetch_related('orderitem_set')
+
+    if not products.exists():
+        return Response({'error': 'No products found'}, status=404)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename=products.csv'
+    response.write(u'\ufeff'.encode('utf8'))  # UTF-8 BOM for Excel compatibility
+    writer = csv.writer(response)
+    writer.writerow(['Product ID', 'Product Name', 'Quantity', 'Price', 'Shop Name'])
+
+    for product in products:
+        total_quantity = sum(item.quantity for item in product.orderitem_set.all())
+        total_price = sum(item.price for item in product.orderitem_set.all())
+        writer.writerow([
+            product.product_id,
+            product.name,
+            total_quantity,
+            total_price,
+            product.shop.shop_name,
+        ])
+
+    return response
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def export_user(request):
+    print("Gia trị url:", request.GET)
+
+    # Lấy danh sách người dùng với tối ưu truy vấn
+    users = User.objects.all().select_related('role')
+
+    if not users.exists():
+        return Response({'error': 'No users found'}, status=404)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename=users.csv'
+    response.write(u'\ufeff'.encode('utf8'))  # UTF-8 BOM for Excel compatibility
+    writer = csv.writer(response)
+    writer.writerow(['User ID', 'Username', 'Email', 'Full Name', 'Role'])
+
+    for user in users:
+        writer.writerow([
+            user.user_id,
+            user.username,
+            user.email,
+            user.full_name,
+            user.role.role_name if user.role else '',
+        ])
+
+    return response
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def export_order(request):
+    print("Gia trị url:", request.GET)
+
+    # Lấy danh sách đơn hàng với tối ưu truy vấn
+    orders = Order.objects.all().select_related('user').prefetch_related('orderitem_set__product__shop', 'payment_set')
+
+    if not orders.exists():
+        return Response({'error': 'No orders found'}, status=404)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename=orders.csv'
+    response.write(u'\ufeff'.encode('utf8'))  # UTF-8 BOM for Excel compatibility
+    writer = csv.writer(response)
+    writer.writerow(['Order ID', 'Product Name', 'Quantity', 'Price', 'Status', 'Transaction', 'Shop Name'])
+
+    for order in orders:
+        payment = order.payment_set.first()
+        for item in order.orderitem_set.all():
+            writer.writerow([
+                order.order_id,
+                item.product.name,
+                item.quantity,
+                item.price,
+                order.status,
+                payment.transaction_id if payment else '',
+                item.product.shop.shop_name,
+            ])
+
+    return response
 
 # API để thêm người dùng mới (POST)
 @api_view(['POST'])
-# @admin_required
 @permission_classes([AllowAny])
 def create_user(request):
-    serializer = UserSerializer(data=request.data)
+    data = request.data
+
+    # Check if username already exists in cache
+    cache_key = 'users_list'
+    users_list = cache.get(cache_key)
+    if users_list:
+        if any(user['username'] == data.get('username') for user in users_list):
+            return Response({"error": "Username already in use."}, status=status.HTTP_400_BAD_REQUEST)
+        if any(user['email'] == data.get('email') for user in users_list):
+            return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        # If cache is empty, fetch from database and update cache
+        users = User.objects.all()
+        users_list = UserSerializer(users, many=True).data
+        cache.set(cache_key, users_list, timeout=86400)  # Cache for 1 day (86400 seconds)
+
+        if any(user['username'] == data.get('username') for user in users_list):
+            return Response({"error": "Username already in use."}, status=status.HTTP_400_BAD_REQUEST)
+        if any(user['email'] == data.get('email') for user in users_list):
+            return Response({"error": "Email already in use."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Hash password
+    password = data.get('password')
+    if password:
+        hashed_password = make_password(password)
+        data['password'] = hashed_password
+
+    # Set created_at
+    data['created_at'] = now()
+
+    # Set role
+    role_name = data.get('role_name')
+    role_instance, created = Role.objects.get_or_create(role_name=role_name)
+    data['role'] = role_instance.pk  # Use pk to get the primary key of the role instance
+
+    # Create user
+    serializer = CreateUserSerializer(data=data)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = serializer.save()
+
+        # Update cache
+        users_list.append(UserSerializer(user).data)
+        cache.set(cache_key, users_list, timeout=86400)  # Cache for 1 day (86400 seconds)
+
+        return Response({"message": "User created successfully. A verification email has been sent."}, status=status.HTTP_201_CREATED)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_statistics(request):
+    # Số lượng người bán (role seller)
+    seller_role = Role.objects.get(role_name='seller')
+    seller_count = User.objects.filter(role=seller_role).count()
+
+    # Số lượng người dùng (tất cả người)
+    user_count = User.objects.count()
+
+    # Số lượng sản phẩm
+    product_count = Product.objects.count()
+
+    # Tổng doanh thu của toàn bộ
+    total_revenue = Order.objects.aggregate(total_revenue=Sum('total'))['total_revenue'] or 0
+
+    data = {
+        'seller_count': seller_count,
+        'user_count': user_count,
+        'product_count': product_count,
+        'total_revenue': total_revenue
+    }
+
+    return Response(data, status=status.HTTP_200_OK)
 
 # API để lấy thông tin chi tiết của một người dùng (GET)
 @api_view(['GET'])
@@ -76,7 +248,16 @@ def update_user(request, user_id):
 @permission_classes([AllowAny])
 def delete_user(request, user_id):
     try:
-        # Lấy đối tượng người dùng
+        # Xóa người dùng trong cache
+        cache_key = 'users_list'
+        users_list = cache.get(cache_key)
+        if users_list:
+            user_in_cache = next((u for u in users_list if u['user_id'] == user_id), None)
+            if user_in_cache:
+                users_list = [u for u in users_list if u['user_id'] != user_id]
+                cache.set(cache_key, users_list, timeout=86400)  # Cache for 1 day (86400 seconds)
+
+        # Lấy đối tượng người dùng từ cơ sở dữ liệu
         user = User.objects.get(user_id=user_id)
 
         # Xử lý các bảng liên quan, như shop (nếu có)
@@ -88,6 +269,7 @@ def delete_user(request, user_id):
 
         # Sau khi xử lý xong, tiến hành xóa người dùng
         user.delete()
+
         return Response({"message": "User deleted successfully!"}, status=200)
 
     except IntegrityError as e:
@@ -97,6 +279,28 @@ def delete_user(request, user_id):
         # Nếu người dùng không tồn tại
         return Response({"error": "User not found!"}, status=404)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_product(request):
+    cache_key = 'product_details'
+    product_details = cache.get(cache_key)
+
+    if product_details:
+        return Response(product_details, status=status.HTTP_200_OK)
+    else:
+        first_image_subquery = ProductImage.objects.filter(
+            product_id=OuterRef('pk')
+        ).values('file')[:1]
+
+        products = Product.objects.values(
+            'product_id', 'name', 'quantity', 'price', 'created_at',
+            shop_name=F('shop__shop_name')
+        ).annotate(
+            image_file=Subquery(first_image_subquery)
+        )
+        product_details = list(products)
+        cache.set(cache_key, product_details, timeout=86400)  # Cache for 1 day (86400 seconds)
+        return Response(product_details, status=status.HTTP_200_OK)
 
 # API để tìm kiếm người dùng dựa trên username, email hoặc role.
 @api_view(['GET'])
@@ -261,9 +465,36 @@ def delete_category(request, category_id):
 # @admin_required
 @permission_classes([AllowAny])
 def get_orders(request):
+    cache_key = 'orders_list'
+    cached_orders = cache.get(cache_key)
+    
+    if cached_orders:
+        return Response(cached_orders, status=status.HTTP_200_OK)
+
     orders = Order.objects.all().order_by('-created_at')  # Sắp xếp theo ngày tạo
-    serialized_data = OrderSerializer(orders, many=True).data
-    return Response(serialized_data, status=status.HTTP_200_OK)
+    order_data = []
+
+    for order in orders:
+        order_items = OrderItem.objects.filter(order=order).select_related('product')
+        for item in order_items:
+            product = item.product
+            shop = product.shop
+            product_image = product.images.first().file if product.images.exists() else None
+            payment = order.payment_set.first()
+
+            order_data.append({
+                'order_id': order.order_id,
+                'product_name': product.name,
+                'product_image': product_image,
+                'quantity': item.quantity,
+                'shop_name': shop.shop_name if shop else None,
+                'price': item.price,
+                'status': order.status,
+                'transaction_id': payment.payment_method if payment else None,
+            })
+
+    cache.set(cache_key, order_data, timeout=86400)  # Cache for 1 day (86400 seconds)
+    return Response(order_data, status=status.HTTP_200_OK)
 
 # API tìm kiếm đơn hàng (GET)
 @api_view(['GET'])

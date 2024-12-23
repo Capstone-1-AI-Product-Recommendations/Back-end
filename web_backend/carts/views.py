@@ -4,16 +4,26 @@ from rest_framework import status
 from web_backend.models import Cart, CartItem, Product
 from .serializers import CartItemSerializer, CartSerializer
 from django.db import transaction
+from django.core.cache import cache  # Import cache
+
 # Create your views here.
 
 # Xem tất cả sản phẩm trong giỏ hàng và tổng số tiền
 @api_view(['GET'])
 def get_cart(request, user_id):
     try:
+        cache_key = f'cart_{user_id}'
+        cached_cart = cache.get(cache_key)
+        
+        if cached_cart:
+            return Response(cached_cart, status=status.HTTP_200_OK)
+        
         cart, created = Cart.objects.get_or_create(user__user_id=user_id)
         if created or not cart.cartitem_set.exists():
             return Response({"message": "Giỏ hàng trống"}, status=status.HTTP_200_OK)
+        
         serializer = CartSerializer(cart)
+        cache.set(cache_key, serializer.data)  # Cache the cart data
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"message": "Giỏ hàng trống"}, status=status.HTTP_200_OK)
@@ -49,6 +59,10 @@ def add_to_cart(request, user_id):
             # Cập nhật số lượng sản phẩm trong giỏ hàng
             cart_item.quantity += quantity
             cart_item.save()
+
+            # Invalidate cache
+            cache_key = f'cart_{user_id}'
+            cache.delete(cache_key)
 
         return Response({"message": "Sản phẩm đã được thêm vào giỏ hàng"}, status=status.HTTP_201_CREATED)
     except Product.DoesNotExist:
@@ -98,6 +112,10 @@ def update_cart_item(request, user_id):
             product.save()
             cart_item.save()
 
+            # Invalidate cache
+            cache_key = f'cart_{user_id}'
+            cache.delete(cache_key)
+
             return Response({"message": "Cập nhật số lượng thành công"}, status=status.HTTP_200_OK)
 
     except CartItem.DoesNotExist:
@@ -129,6 +147,9 @@ def remove_from_cart(request, user_id, cart_item_id):
             # Xóa sản phẩm khỏi giỏ hàng
             cart_item.delete()
 
+            # Invalidate cache
+            cache_key = f'cart_{user_id}'
+            cache.delete(cache_key)
 
         return Response({"message": "Sản phẩm đã được xóa khỏi giỏ hàng"}, status=status.HTTP_200_OK)
     except CartItem.DoesNotExist:
@@ -141,6 +162,11 @@ def clear_cart(request, user_id):
         # Lấy giỏ hàng của người dùng và xóa tất cả sản phẩm
         cart = Cart.objects.get(user__user_id=user_id)
         cart.cartitem_set.all().delete()
+
+        # Invalidate cache
+        cache_key = f'cart_{user_id}'
+        cache.delete(cache_key)
+
         return Response({"message": "Giỏ hàng đã được xóa"}, status=status.HTTP_204_NO_CONTENT)
     except Cart.DoesNotExist:
         return Response({"error": "Giỏ hàng không tồn tại"}, status=status.HTTP_404_NOT_FOUND)

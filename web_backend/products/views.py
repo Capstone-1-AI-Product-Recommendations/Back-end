@@ -24,13 +24,20 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Count, F, Sum
 from django.db.models.functions import Coalesce
 from django.db.models import Value, IntegerField, Case, When
+from django.core.cache import cache
 
+CACHE_TIMEOUT = 60 * 15  # Cache timeout in seconds (15 minutes)
 
 @api_view(['GET'])
 def get_random_relevant_products(request):
     user_id = request.query_params.get('user_id')  # Lấy user_id từ query parameter
     if not user_id:
         return Response({"error": "Missing user_id"}, status=400)
+
+    cache_key = f'random_relevant_products_{user_id}'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
 
     # Lấy các sản phẩm liên quan từ UserBrowsingBehavior
     user_behaviors = UserBrowsingBehavior.objects.filter(user_id=user_id)
@@ -76,12 +83,20 @@ def get_random_relevant_products(request):
         for product in random_products
     ]
 
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 # API to retrieve product details by product ID
 @api_view(['GET'])
 def product_detail(request, product_id):
     print("user_id", product_id)
+
+    cache_key = f'product_detail_{product_id}'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        
+        return Response(cached_data)
+
     try:
         # Sử dụng select_related cho 'subcategory' và 'shop__user', và prefetch_related cho ảnh và video
         product = Product.objects.select_related('subcategory', 'shop__user') \
@@ -107,6 +122,7 @@ def product_detail(request, product_id):
     data['review_count'] = product.comment_set.count()
     data['detail_product'] = product.detail_product
 
+    cache.set(cache_key, data, CACHE_TIMEOUT)
     return Response(data)
 
 @api_view(['GET'])
@@ -161,6 +177,7 @@ def create_product(request, seller_id, shop_id):
         shop_info.product_count += 1
         shop_info.save()
         
+        cache.clear()  # Clear cache on product creation
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -222,6 +239,7 @@ def update_product(request, seller_id, shop_id, product_id):
     # Lưu các thay đổi
     product.save()
 
+    cache.clear()  # Clear cache on product update
     return Response({"detail": "Product updated successfully."}, status=status.HTTP_200_OK)
 
 @api_view(['DELETE'])
@@ -253,6 +271,7 @@ def delete_product(request, seller_id, shop_id, product_id):
             pass  # Nếu không có ShopInfo liên kết, bỏ qua
         # Xóa sản phẩm
         product.delete()
+        cache.clear()  # Clear cache on product deletion
         return Response({"detail": "Product deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
     except Product.DoesNotExist:
         return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -261,6 +280,12 @@ import re
 # API to get the featured products (Top 6 products marked as featured)
 @api_view(['GET'])
 def get_featured_products(request):
+    cache_key = 'featured_products'
+    cached_data = cache.get(cache_key)
+    if (cached_data):
+        print("cached_data exist")
+        return Response(cached_data)
+
     featured_products = Product.objects.filter(is_featured=True).prefetch_related('images', 'productad_set__ad')[:8]
     serialized_data = [
         {
@@ -274,11 +299,18 @@ def get_featured_products(request):
         }
         for product in featured_products
     ]
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 # API to get trending products based on various criteria
 @api_view(['GET'])
 def get_trending_products(request):
+    cache_key = 'trending_products'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        print("cached_data exist")
+        return Response(cached_data)
+
     trending_products = Product.objects.annotate(
         total_sales=Sum('orderitem__quantity'),
         total_views=Count('userbrowsingbehavior__product'),
@@ -306,11 +338,18 @@ def get_trending_products(request):
         }
         for product in trending_products
     ]
+    print("Đã lưu thông tin sản phẩm")
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 # API to get random products (28 random products)
 @api_view(['GET'])
 def get_random_products(request):
+    cache_key = 'random_products'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     product_count = Product.objects.count()
     if product_count == 0:
         return Response([])  # Trả về danh sách rỗng nếu không có sản phẩm
@@ -336,11 +375,18 @@ def get_random_products(request):
         }
         for product in random_products
     ]
+
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 # API to get popular categories (Top 3 categories with most subcategories)
 @api_view(['GET'])
 def get_popular_categories(request):
+    cache_key = 'popular_categories'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     # Annotate categories with the count of their subcategories
     popular_categories = Category.objects.annotate(
         subcategory_count=Count('subcategory')  # 'subcategory' là related_name của ForeignKey trong model Subcategory
@@ -348,17 +394,31 @@ def get_popular_categories(request):
 
     # Serialize the data
     serialized_data = CategorySerializer(popular_categories, many=True).data
+
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 # API to get all categories
 @api_view(['GET'])
 def get_all_categories(request):
+    cache_key = 'all_categories'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     all_categories = Category.objects.all()
     serialized_data = CategorySerializer(all_categories, many=True).data
+
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 @api_view(['GET'])
 def get_top_subcategories(request):
+    cache_key = 'top_subcategories'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     try:
         # Get top 5 subcategories based on product sales
         top_subcategories = Subcategory.objects.annotate(
@@ -382,6 +442,7 @@ def get_top_subcategories(request):
             'category_name': subcategory.category.category_name if subcategory.category else None
         } for subcategory in top_subcategories]
 
+        cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
         return Response(serialized_data, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -392,6 +453,11 @@ def get_top_subcategories(request):
 
 @api_view(['GET'])
 def get_categories_subcategory(request):
+    cache_key = 'categories_subcategory'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     # Get categories with their subcategories, ordered by total sales_strategy
     top_categories = Category.objects.annotate(
         total_sales=Coalesce(
@@ -422,25 +488,45 @@ def get_categories_subcategory(request):
         }
         serialized_data.append(category_data)
 
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 
 # API to get the latest comments (Top 3 latest comments)
 @api_view(['GET'])
 def get_latest_comments(request):
+    cache_key = 'latest_comments'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     latest_comments = Comment.objects.order_by('-created_at')[:3]
     serialized_data = CommentSerializer(latest_comments, many=True).data
+
+    cache.set(cache_key, serialized_data, CACHE_TIMEOUT)
     return Response(serialized_data)
 
 @api_view(['GET'])
 def get_ads(request):
+    cache_key = 'ads'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     ads = Ad.objects.all()  # Get all ads from the database
     serializer = AdSerializer(ads, many=True)
+
+    cache.set(cache_key, serializer.data, CACHE_TIMEOUT)
     return Response(serializer.data)
 
 # API to aggregate data for the homepage
 @api_view(['GET'])
 def homepage_api(request):
+    cache_key = 'homepage_data'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return Response(cached_data)
+
     featured_products = get_featured_products(request).data
     trending_products = get_trending_products(request).data
     random_products = get_random_products(request).data
@@ -461,6 +547,7 @@ def homepage_api(request):
         'all_categories': all_categories,
     }
 
+    cache.set(cache_key, data, CACHE_TIMEOUT)
     return Response(data)
 
 # Bộ lọc theo category
