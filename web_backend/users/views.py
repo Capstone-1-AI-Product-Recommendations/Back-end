@@ -494,10 +494,6 @@ def get_user_behavior(request, user_id):
     
 @api_view(['POST'])
 def register_seller(request, user_id):
-    """
-    Người dùng gửi yêu cầu đăng ký trở thành seller.
-    Lưu thông tin vào bảng Notification với trạng thái 'Đang chờ' và gửi thông báo cho admin.
-    """
     try:
         # Kiểm tra user_id hợp lệ
         user = User.objects.get(user_id=user_id)
@@ -558,9 +554,6 @@ def register_seller(request, user_id):
 
 @api_view(['POST'])
 def accept_or_reject_seller(request, admin_id):
-    """
-    API cho phép admin xác nhận hoặc từ chối yêu cầu đăng ký seller của người dùng.
-    """
     try:
         # Lấy thông tin admin từ admin_id
         admin = User.objects.get(user_id=admin_id)
