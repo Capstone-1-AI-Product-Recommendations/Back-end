@@ -388,7 +388,7 @@ class UserBehavior(models.Model):
         (PURCHASE, 'Purchase'),
         (SEARCH, 'Search'),
     ]
-
+    user_behavior_id = models.BigAutoField(primary_key=True)
     user_id = models.BigIntegerField(null=True, blank=True)  # user_id BIGINT NULL
     session_id = models.CharField(max_length=255, null=True, blank=True)  # session_id VARCHAR(255) NULL
     action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)  # action_type ENUM(...)

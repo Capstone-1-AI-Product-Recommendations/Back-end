@@ -1,10 +1,11 @@
 from django.core.cache import cache 
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .tasks import generate_recommendations
+from products.views import get_user_id_from_cookie
+from .tasks import generate_recommendations, recommend_behavior
 from celery.result import AsyncResult
-import json
-
+from rest_framework.decorators import api_view
+import time
 class BatchRecommendationsView(APIView):
     def get(self, request, user_id):
         # Kiểm tra user_id hợp lệ
@@ -32,7 +33,6 @@ class BatchRecommendationsView(APIView):
         print(f"New task_id={task.id} created for user_id={user_id}")
         return Response({"task_id": task.id})
 
-
 class GetBatchRecommendationsView(APIView):
     def get(self, request, task_id):
         # Tạo cache key để ánh xạ task_id -> user_id
@@ -48,8 +48,8 @@ class GetBatchRecommendationsView(APIView):
         result = AsyncResult(task_id)
         print(f"Checking status for task_id={task_id}, user_id={user_id}")
 
-        # Nếu task đã hoàn thành, kiểm tra cache
-        if result.status == "SUCCESS":
+        # Nếu task đã hoàn thành và kết quả không phải là None, kiểm tra cache
+        if result.status == "SUCCESS" and result.result is not None:
             # Lưu kết quả vào cache nếu chưa có
             result_cache_key = f"recommendation_result:{user_id}"
             cached_result = cache.get(result_cache_key)
@@ -64,3 +64,33 @@ class GetBatchRecommendationsView(APIView):
             "result": result.result if result.status == "SUCCESS" else None,
         }
         return Response(response)
+    
+@api_view(['GET'])
+def trigger_recommend_behavior(request):
+    print("Received request to trigger recommend_behavior task")
+    session_id = request.COOKIES.get('session_id')
+    print("session_id", session_id)
+    
+    user_id = get_user_id_from_cookie(request)
+    print("user_id", user_id)
+    print(f"Received request with session_id={session_id}, user_id={user_id}")
+    if not session_id and not user_id:
+        return Response({"error": "Missing session_id or user_id"}, status=400)
+
+    # Gửi task tới Celery
+    task = recommend_behavior.apply_async(kwargs={'session_id': session_id, 'user_id': user_id})
+
+    # Đợi kết quả tối đa 15 giây
+    timeout = 15
+    elapsed = 0
+    while elapsed < timeout:
+        task_result = AsyncResult(task.id)
+        if task_result.state == 'SUCCESS':
+            return Response({"status": "success", "result": task_result.result}, status=200)
+        elif task_result.state == 'FAILURE':
+            return Response({"status": "failed", "error": str(task_result.info)}, status=500)
+        time.sleep(1)  # Đợi 1 giây
+        elapsed += 1
+
+    # Nếu tác vụ chưa hoàn thành, trả về `task_id` để kiểm tra sau
+    return Response({"status": "pending", "task_id": task.id}, status=202)

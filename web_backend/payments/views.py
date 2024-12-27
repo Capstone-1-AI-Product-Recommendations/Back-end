@@ -21,6 +21,7 @@ import base64
 from io import BytesIO
 from django.http import HttpResponse
 import uuid
+from django.core.cache import cache  
 
 
 # Khởi tạo đối tượng PayOS
@@ -124,6 +125,7 @@ def payos(request, user_id, order_id):
 @api_view(['POST'])
 def payment_cod(request, user_id, order_id):
     try:
+        session_id = request.COOKIES.get('session_id')        
         # Get user and order
         user = get_object_or_404(User, user_id=user_id)
         order = get_object_or_404(Order, order_id=order_id, user=user)
@@ -161,12 +163,12 @@ def payment_cod(request, user_id, order_id):
             )
 
             # Debug logging
-            print(f"Order items: {[item.product.product_id for item in order_items]}")
-            print(f"User cart items before deletion: {CartItem.objects.filter(cart__user=user).count()}")
+            print(f"Order items: {[item.product.product_id for item in order_items]}")           
 
             # Remove paid items from the cart
             CartItem.objects.filter(cart__user=user, product__in=[item.product for item in order_items]).delete()
-
+            cache_key = f'cart_{user_id}'
+            cache.delete(cache_key)
             # Debug logging
             print(f"User cart items after deletion: {CartItem.objects.filter(cart__user=user).count()}")
             print("Xóa sản phẩm khỏi giỏ hàng")

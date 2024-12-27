@@ -24,11 +24,8 @@ from django.forms import ValidationError
 from django.contrib.sessions.models import Session
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-# from rest_framework.views import APIView
-# from rest_framework.permissions import IsAdminUser
-# from .decorators import admin_required
-# from .models import User, Role
-# from .serializers import UserSerializer
+import uuid
+import json
 
 def validate_email_format(value):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
@@ -109,20 +106,47 @@ def login_view(request):
         if serializer.is_valid():
             username = serializer.validated_data.get('username')
             password = serializer.validated_data.get('password')
+            # Lấy session_id từ cookie
+            session_id = request.COOKIES.get('session_id') 
+            print("SessionID 1", session_id)
             try:
                 user = User.objects.get(username=username)
                 if check_password(password, user.password):
                     token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
+                    # Cập nhật user_id cho các hành vi liên quan đến session_id
+                    if session_id:
+                        UserBehavior.objects.filter(session_id=session_id).update(user_id=user.user_id)
                     user_serializer = LoginUserSerializer(user) 
-                    response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)                   
+                    # Tạo session_id mới nếu cần
+                    session_id = session_id or str(uuid.uuid4())
+                    print("SessionID 2", session_id)
+                    response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)                                    
                     response.set_cookie(
                         'user_token',  # Cookie name
                         token,  # Token value
                         max_age=36000,  # Expiry time in seconds
-                        httponly=True,  # Prevent JavaScript access
+                        httponly=False,  # Prevent JavaScript access
                         secure=True,  # Only send over HTTPS
-                        samesite='Lax'  # SameSite security policy
+                        samesite='None',  # SameSite security policy                        
                     )
+                    response.set_cookie(
+                        'user',  # Cookie name
+                        json.dumps(user_serializer.data),  # Convert the user data to JSON
+                        max_age=7 * 24 * 60 * 60,  # Expire in 7 days
+                        httponly=False,  # Prevent JavaScript access
+                        secure=True,  # Only send over HTTPS
+                        samesite='None',)  # SameSite security policy)
+                  
+                    # Set session_id vào cookie
+                    response.set_cookie(
+                        'session_id',  # Tên cookie cho session_id
+                        session_id,  # Giá trị session_id
+                        max_age=7 * 24 * 60 * 60,  # Thời gian tồn tại (7 ngày)
+                        httponly=False,  # Prevent JavaScript access
+                        secure=True,  # Only send over HTTPS
+                        samesite='None',  # SameSite security policy)hính sách SameSite                        
+                    )
+                    print(response.cookies)
                     return response
                 else:
                     return Response({"message": "Invalid password"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -133,8 +157,23 @@ def login_view(request):
 # Logout User
 @api_view(['POST'])
 def logout_view(request, user_id):
+    # Xóa cookie 'user_token'
+    print("Truoc khi logout", request.COOKIES)
     response = Response({"message": f"User logged out successfully"}, status=status.HTTP_200_OK)
-    response.delete_cookie('user_token')  # Xóa cookie nếu tồn tại
+      # Xóa cookie 'user_token'
+    response.set_cookie('user_token',
+                        '',  # Empty value
+                        max_age=0,  # Expiry time in seconds
+                        httponly=False,  # Prevent JavaScript access
+                        secure=True,  # Only send over HTTPS
+                        samesite='None',)  # SameSite security policy)
+    response.set_cookie('user',
+                        '',  # Empty value
+                        max_age=0,  # Expiry time in seconds
+                        httponly=False,  # Prevent JavaScript access
+                        secure=True,  # Only send over HTTPS
+                        samesite='None',)  # SameSite security policy)
+    
     return response
 
 # Google Sign-Up View to generate Google OAuth login URL

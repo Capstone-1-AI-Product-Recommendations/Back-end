@@ -1,92 +1,30 @@
+import redis
+import json
 from django.utils.timezone import now
-from django.utils.deprecation import MiddlewareMixin
 import logging
-from web_backend.models import UserBrowsingBehavior, Product, User, CartItem, Cart
 
-# Cấu hình logging
 logger = logging.getLogger(__name__)
 
-class UserActivityLoggingMiddleware(MiddlewareMixin):
-    def __init__(self, get_response):
-        self.get_response = get_response
+# Kết nối Redis
+def get_redis_connection():
+    return redis.Redis(host='127.0.0.1', port=6379, db=1)
 
-    def __call__(self, request):
-        response = self.get_response(request)
-
-        if request.method == 'GET' and 'products/detail' in request.path:
-            if request.resolver_match:
-                user_id = request.resolver_match.kwargs.get('user_id')
-                product_id = request.resolver_match.kwargs.get('product_id')
-
-                if user_id and product_id:
-                    try:
-                        user = User.objects.get(user_id=user_id)
-                        product = Product.objects.get(product_id=product_id)
-
-                        # Lưu hành động vào database
-                        UserBrowsingBehavior.objects.create(
-                            user=user,
-                            product=product,
-                            activity_type='viewed_product',
-                            interaction_value=1.0,
-                            timestamp=now(),
-                        )
-
-                        logger.info(f"User {user.username} viewed product {product.name}")
-
-                    except User.DoesNotExist:
-                        logger.error(f"User with ID {user_id} does not exist")
-                    except Product.DoesNotExist:
-                        logger.error(f"Product with ID {product_id} does not exist")
-
-        # Lưu hành động tìm kiếm sản phẩm
-        if request.method == 'GET' and 'search/' in request.path:
-            user_id = request.GET.get('user_id')  # Nếu user_id được truyền qua query params, hoặc có thể lấy từ session
-
-            if user_id:
-                search_term = request.GET.get('search_term')
-                category = request.GET.get('category')
-                min_price = request.GET.get('min_price')
-                max_price = request.GET.get('max_price')
-
-                # Ghi lại hành động tìm kiếm
-                if search_term or category or min_price or max_price:
-                    try:
-                        user = User.objects.get(id=user_id)
-
-                        # Lưu hành động tìm kiếm vào database
-                        UserBrowsingBehavior.objects.create(
-                            user=user,
-                            activity_type='searched_product',
-                            interaction_value=1.0,
-                            timestamp=now(),
-                        )
-                        logger.info(f"User {user.username} searched for products with terms: {search_term}, category: {category}")
-
-                    except User.DoesNotExist:
-                        logger.error(f"User with ID {user_id} does not exist")
-
-        # Lưu hành động thêm vào giỏ hàng
-        if request.method == 'POST' and 'cart/add' in request.path:
-            user_id = request.resolver_match.kwargs.get('user_id')
-            product_id = request.POST.get('product_id') or request.data.get('product_id')  # Xử lý cả request từ form và JSON
-            
-            if user_id and product_id:
-                try:
-                    user = User.objects.get(user_id=user_id)
-                    product = Product.objects.get(product_id=product_id)
-
-                    UserBrowsingBehavior.objects.create(
-                        user=user,
-                        product=product,
-                        activity_type='added_to_cart',
-                        interaction_value=1.0,
-                        timestamp=now(),
-                    )
-                    logger.info(f"User {user.username} added product {product.name} to cart")
-                except User.DoesNotExist:
-                    logger.error(f"User with ID {user_id} does not exist")
-                except Product.DoesNotExist:
-                    logger.error(f"Product with ID {product_id} does not exist")
-
-        return response
+# Hàm ghi dữ liệu vào cache
+def cache_action(session_id, action_type, user_id=None, product_id=None, quantity=1, search_query=None):
+    try:
+        r = get_redis_connection()
+        key = f"user_behavior:{session_id}"  # Sử dụng session_id làm key
+        action = {
+            "user_id": user_id,
+            "session_id": session_id,
+            "action_type": action_type,
+            "product_id": product_id,
+            "quantity": quantity,
+            "search_query": search_query,
+            "timestamp": now().isoformat(),
+        }
+        r.rpush(key, json.dumps(action))  # Thêm dữ liệu vào danh sách
+        r.expire(key, 3600 * 24)  # Đặt thời gian hết hạn là 1 ngày
+        logger.info(f"Cached action: {action} under key: {key}")
+    except redis.ConnectionError as e:
+        logger.error(f"Redis connection error: {e}")

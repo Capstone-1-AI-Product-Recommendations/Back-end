@@ -12,6 +12,11 @@ celery -A web_backend worker --pool=solo --loglevel=debug
 
 celery -A web_backend worker --pool=solo --loglevel=info
 
+#sử dụng nhiều tiến trình 
+celery -A web_backend worker --pool=threads --loglevel=info --concurrency=8
+
+celery -A web_backend beat --loglevel=info
+
 python.exe -m pip install --upgrade pip
 
 pip install -r requirements.txt

@@ -15,20 +15,27 @@ class ProductRecommendationSerializer(serializers.ModelSerializer):
 
     def get_product(self, obj):
         # Check if the product exists and serialize it
-        if obj.product:
+        if (obj.product):
             return ProductSerializer(obj.product).data
         return None  # If no product exists, return None
 
     def get_category(self, obj):
         # Check if the category exists and serialize it
-        if obj.category:
+        if (obj.category):
             return CategorySerializer(obj.category).data
         return None  # If no category exists, return None
 
 class ProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Product  # Set the correct model
-        fields = '__all__'
+        fields = ['product_id', 'name', 'price', 'rating', 'image_url']
+
+    def get_image_url(self, obj):
+        # Assuming the Product model has a related name 'images' for ProductImage
+        image = obj.images.first()
+        return image.file if image else None
 
 class UserBrowsingBehaviorSerializer(serializers.ModelSerializer):
     class Meta:

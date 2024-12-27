@@ -25,6 +25,10 @@ from django.db.models import Count, F, Sum
 from django.db.models.functions import Coalesce
 from django.db.models import Value, IntegerField, Case, When
 from django.core.cache import cache
+from web_backend.middleware import cache_action
+from django.http import JsonResponse
+import json
+
 
 CACHE_TIMEOUT = 60 * 15  # Cache timeout in seconds (15 minutes)
 
@@ -89,6 +93,8 @@ def get_random_relevant_products(request):
 # API to retrieve product details by product ID
 @api_view(['GET'])
 def product_detail(request, product_id):
+    session_id = request.COOKIES.get('session_id')
+    user_id = get_user_id_from_cookie(request)    
     print("user_id", product_id)
 
     cache_key = f'product_detail_{product_id}'
@@ -121,7 +127,13 @@ def product_detail(request, product_id):
     data['sales_strategy'] = product.sales_strategy
     data['review_count'] = product.comment_set.count()
     data['detail_product'] = product.detail_product
-
+    
+    cache_action(
+            session_id=session_id,
+            action_type='view',  
+            user_id= user_id,          
+            product_id=product_id,            
+        )
     cache.set(cache_key, data, CACHE_TIMEOUT)
     return Response(data)
 
@@ -651,9 +663,26 @@ def filter_by_stock_status(request):
         return Response(serialized_data, status=200)
     return Response({"message": "stock_status parameter is required"}, status=400)
 
+def get_user_id_from_cookie(request):
+    user_cookie = request.COOKIES.get('user')  # Lấy giá trị cookie 'user'
+    if user_cookie:
+        try:
+            # Giải mã JSON từ chuỗi cookie
+            user_data = json.loads(user_cookie)
+            user_id = user_data.get('user_id')  # Lấy giá trị user_id từ JSON
+            return user_id
+        except json.JSONDecodeError:
+            # Trường hợp cookie không phải JSON hợp lệ
+            print("Invalid JSON in user cookie")
+            return None
+    return None  # Trả về None nếu cookie không tồn tại
+
 @api_view(['GET'])
 def filter_page(request):
     try:
+        session_id = request.COOKIES.get('session_id')
+        user_id = get_user_id_from_cookie(request)              
+        
         # Bắt đầu với tất cả sản phẩm
         base_products = Product.objects.all()
 
@@ -753,7 +782,12 @@ def filter_page(request):
             }
             for product in combined_results
         ]
-
+        cache_action(
+            session_id=session_id,
+            action_type='search',  
+            user_id= user_id,          
+            search_query=search_term,            
+        )
         return Response({
             "products": products_serialized,
             "total_count": len(products_serialized)
@@ -765,10 +799,12 @@ def filter_page(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-def search_products(request):
-    print("Đã vào được ", request.GET)
+def search_products(request):    
     search_term = request.GET.get('search_term', '').strip()
+    session_id = request.COOKIES.get('session_id')
+    
     print("search_term", search_term)
+    print("session_id", session_id)
     if not search_term:
         return Response(
             {"error": "Please provide a search term"}, 
@@ -856,7 +892,11 @@ def search_products(request):
         }
         for product in sorted_results
     ]
-
+    cache_action(
+            session_id=session_id,
+            action_type='search',            
+            search_query=search_term,            
+        )
     return Response({
         "message": "Products found successfully",
         "products": serialized_data,

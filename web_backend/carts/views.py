@@ -2,12 +2,15 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from web_backend.models import Cart, CartItem, Product
+from web_backend.middleware import cache_action
 from .serializers import CartItemSerializer, CartSerializer
 from django.db import transaction
 from django.core.cache import cache  # Import cache
+from django.http import JsonResponse  # Import JsonResponse
+import logging
 
 # Create your views here.
-
+logger = logging.getLogger(__name__)
 # Xem tất cả sản phẩm trong giỏ hàng và tổng số tiền
 @api_view(['GET'])
 def get_cart(request, user_id):
@@ -30,16 +33,18 @@ def get_cart(request, user_id):
 
 # Thêm sản phẩm vào giỏ hàng
 @api_view(['POST'])
-def add_to_cart(request, user_id):
-    try:
+def add_to_cart(request, user_id):    
+    try:                      
         product_id = request.data.get('product_id')
         quantity = int(request.data.get('quantity', 1))  # Mặc định số lượng là 1 nếu không cung cấp
-
+        session_id = request.COOKIES.get('session_id')
+        print("SessionID", session_id)
+        
         if not product_id:
             return Response({"error": "Thiếu product_id"}, status=status.HTTP_400_BAD_REQUEST)
         
         with transaction.atomic():  # Sử dụng transaction để đảm bảo dữ liệu nhất quán
-            product = Product.objects.select_for_update().get(product_id=product_id)
+            product = Product.objects.select_for_update().get(product_id=product_id)           
 
             if product.quantity < quantity:
                 return Response({"error": "Không đủ số lượng sản phẩm trong kho"}, status=status.HTTP_400_BAD_REQUEST)
@@ -64,6 +69,18 @@ def add_to_cart(request, user_id):
             cache_key = f'cart_{user_id}'
             cache.delete(cache_key)
 
+            # Cập nhật cache
+            serializer = CartSerializer(cart)
+            cache.set(cache_key, serializer.data)
+
+            # Ghi vào cache
+            cache_action(
+                session_id=session_id,
+                action_type='add_to_cart',
+                user_id=user_id,
+                product_id=product_id,
+                quantity=quantity,
+            )
         return Response({"message": "Sản phẩm đã được thêm vào giỏ hàng"}, status=status.HTTP_201_CREATED)
     except Product.DoesNotExist:
         return Response({"error": "Sản phẩm không tồn tại"}, status=status.HTTP_400_BAD_REQUEST)
@@ -116,6 +133,11 @@ def update_cart_item(request, user_id):
             cache_key = f'cart_{user_id}'
             cache.delete(cache_key)
 
+            # Cập nhật cache
+            cart = cart_item.cart
+            serializer = CartSerializer(cart)
+            cache.set(cache_key, serializer.data)
+
             return Response({"message": "Cập nhật số lượng thành công"}, status=status.HTTP_200_OK)
 
     except CartItem.DoesNotExist:
@@ -135,7 +157,7 @@ def remove_from_cart(request, user_id, cart_item_id):
             cart_item = CartItem.objects.select_related('product').get(cart__user_id=user_id, cart_item_id=cart_item_id)
             product = cart_item.product
 
-              # Xử lý giá trị None bằng cách gán mặc định 0
+            # Xử lý giá trị None bằng cách gán mặc định 0
             if product.quantity is None:
                 product.quantity = 0
             if cart_item.quantity is None:
@@ -151,9 +173,16 @@ def remove_from_cart(request, user_id, cart_item_id):
             cache_key = f'cart_{user_id}'
             cache.delete(cache_key)
 
+            # Cập nhật cache
+            cart = cart_item.cart
+            serializer = CartSerializer(cart)
+            cache.set(cache_key, serializer.data)
+
         return Response({"message": "Sản phẩm đã được xóa khỏi giỏ hàng"}, status=status.HTTP_200_OK)
     except CartItem.DoesNotExist:
         return Response({"error": "Sản phẩm không tồn tại trong giỏ hàng"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"error": f"Đã xảy ra lỗi: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 # Xóa tất cả sản phẩm trong giỏ hàng
 @api_view(['DELETE'])

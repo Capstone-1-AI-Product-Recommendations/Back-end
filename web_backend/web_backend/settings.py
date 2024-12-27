@@ -64,28 +64,16 @@ INSTALLED_APPS = [
     'web_backend',  # Ensure this is listed only once
     'django_celery_results',
     'django_celery_beat',
-    'channels',
+    'channels',    
 ]
 
 ASGI_APPLICATION = 'web_backend.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
-    },
-}
+
 
 MIGRATION_MODULES = {
-    # 'auth': None,  # Ngừng tạo bảng cho 'auth' (tạo bảng như user, permission, group)
-    # 'sessions': None,  # Ngừng tạo bảng cho 'sessions'
-    # 'admin': None,  # Ngừng tạo bảng cho 'admin'
     'messages': None,  # Ngừng tạo bảng cho 'messages'
-    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'
-    # 'contenttypes': None,  # ngừng tạo bảng contenttypes
-    # Nếu bạn không dùng 'authtoken' và 'account' (liên quan đến xác thực)
+    'staticfiles': None,  # Ngừng tạo bảng cho 'staticfiles'    
     'authtoken': None,  # Ngừng tạo bảng 'authtoken'
     'account': None,  # Ngừng tạo bảng 'account' từ django-allauth hoặc các ứng dụng tương tự
     'socialaccount': None,  # Ngừng tạo bảng 'socialaccount' nếu bạn không dùng Social Authentication
@@ -95,23 +83,24 @@ MIGRATION_MODULES = {
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    'corsheaders.middleware.CorsMiddleware',  # Add this line before CommonMiddleware
+    "django.contrib.sessions.middleware.SessionMiddleware",    
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'allauth.account.middleware.AccountMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',    
     # 'web_backend.middleware.UserActivityLoggingMiddleware',
 ]
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Add your frontend URL here
     "http://127.0.0.1:3000",
 ]
+
+SESSION_COOKIE_DOMAIN = '127.0.0.1'  # Đảm bảo backend chỉ đặt cookie cho một domain
+
 
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -283,7 +272,8 @@ LOGIN_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000',  
+    "http://localhost:3000",  # Add your frontend URL here
+    "http://127.0.0.1:3000",
     'http://127.0.0.1:8000/api/auth/registration/google/'
 ]
 CORS_ORIGIN_ALLOW_ALL = False
@@ -325,9 +315,13 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_IGNORE_RESULT = False
 CELERY_TASK_RESULT_EXPIRES = 3600  # 1 giờ
 CELERY_BEAT_SCHEDULE = {
-    'generate-recommendations-every-5-minutes': {
-        'task': 'recommendations.tasks.generate_recommendations',
-        'schedule': crontab(minute='*/5'),
+    # 'generate-recommendations-every-5-minutes': {
+    #     'task': 'recommendations.tasks.generate_recommendations',
+    #     'schedule': crontab(minute='*/5'),
+    # },
+    'sync-user-behavior-every-hour': {
+        'task': 'web_backend.tasks.sync_user_behavior',
+        'schedule': crontab(minute='5'), 
     },
 }
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
@@ -343,3 +337,20 @@ CACHES = {
         }
     }
 }
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+# Ensure CSRF settings allow cross-site requests
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
+# Ensure session settings allow cross-site requests
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
