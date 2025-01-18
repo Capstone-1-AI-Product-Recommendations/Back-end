@@ -28,9 +28,17 @@ from django.core.cache import cache
 from web_backend.middleware import cache_action
 from django.http import JsonResponse
 import json
-
+from web_backend.models import Product
 
 CACHE_TIMEOUT = 60 * 15  # Cache timeout in seconds (15 minutes)
+
+
+def get_product(request):
+    if request.method == 'GET':
+        products = Product.objects.values('product_id', 'name', 'rating', 'price', 'description')[:10]
+        return JsonResponse(list(products), safe=False)
+    else:
+        return JsonResponse({'error': 'GET method required'}, status=405)
 
 @api_view(['GET'])
 def get_random_relevant_products(request):

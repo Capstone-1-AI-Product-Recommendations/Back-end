@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import (filter_by_subcategory, product_detail, create_product, update_product, delete_product,
+from .views import (filter_by_subcategory, get_product, product_detail, create_product, update_product, delete_product,
     get_featured_products, get_trending_products, get_random_products,
     get_popular_categories, get_all_categories, get_latest_comments,
     filter_by_category, filter_by_price, filter_by_color, filter_by_brand,
@@ -7,6 +7,8 @@ from .views import (filter_by_subcategory, product_detail, create_product, updat
 )
 
 urlpatterns = [
+    path('get_product/', get_product, name='get_product'),
+    
     # Product display APIs
     path('featured/', get_featured_products, name='featured_products'),
     path('trending/', get_trending_products, name='trending_products'),

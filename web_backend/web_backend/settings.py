@@ -26,7 +26,9 @@ SECRET_KEY = "django-insecure-+7t4hvz!@5#(_p)qk)7v4z^c!42=kky2sokrefs$&rv7=%9q6g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["172.20.222.211", "localhost", "127.0.0.1", "0.0.0.0", "192.168.1.12"]
+
+
 
 SITE_ID = 1
 # Application definition
@@ -95,8 +97,11 @@ MIDDLEWARE = [
 CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Add your frontend URL here
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://172.20.222.211:3000",
+    "http://192.168.1.12:8000",
+    "http://172.20.222.211:8000",
 ]
 
 SESSION_COOKIE_DOMAIN = '127.0.0.1'  # Đảm bảo backend chỉ đặt cookie cho một domain
@@ -255,6 +260,7 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.JSONParser',
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
@@ -272,9 +278,11 @@ LOGIN_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/'
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",  # Add your frontend URL here
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
-    'http://127.0.0.1:8000/api/auth/registration/google/'
+    'http://127.0.0.1:8000/api/auth/registration/google/',
+    "http://172.20.222.211:8000",
+    "http://192.168.1.12:8000",
 ]
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = [
@@ -354,3 +362,5 @@ CSRF_COOKIE_SECURE = True
 # Ensure session settings allow cross-site requests
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
+
+# SECURE_SSL_REDIRECT = True
