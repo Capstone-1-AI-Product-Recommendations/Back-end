@@ -1,12 +1,11 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from web_backend.models import PurchasedProduct, Order, OrderItem, CartItem, User , ShippingAddress
+from web_backend.models import PurchasedProduct, Order, OrderItem, CartItem, User , ShippingAddress, Product
 from .serializers import OrderSerializer, ShippingAddressSerializer
 import json
 from django.utils import timezone
 from django.db import transaction
-
 @api_view(['POST'])
 def create_order(request, user_id):
     try:
@@ -82,6 +81,67 @@ def create_order(request, user_id):
     order_serializer = OrderSerializer(order)
     return Response(order_serializer.data, status=status.HTTP_201_CREATED)
 
+from django.shortcuts import get_object_or_404
+from web_backend.authentication import CustomJWTAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import authentication_classes, permission_classes
+from rest_framework.exceptions import AuthenticationFailed
+# api middleware
+@authentication_classes([CustomJWTAuthentication])  # Xác thực thông qua JWT
+@permission_classes([IsAuthenticated]) 
+@api_view(['POST'])
+def create_order_restapi(request):
+    """
+    API tạo đơn hàng từ productid và số lượng sản phẩm muốn mua.
+    """
+    # Lấy user từ request.user (đã được xác thực thông qua JWT)
+    user = request.user
+    
+    # Kiểm tra nếu không có user
+    if not user:
+        raise AuthenticationFailed('Bạn cần đăng nhập để truy cập tài nguyên này.')
+
+    # Lấy productid và số lượng từ request body
+    productid = request.data.get('productid')
+    number_of_items = request.data.get('number_of_items')
+
+    # Kiểm tra đầu vào
+    if not productid or not isinstance(number_of_items, int) or number_of_items <= 0:
+        return Response({"error": "04: Số lượng không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Kiểm tra sản phẩm có tồn tại hay không
+    product = Product.objects.filter(product_id=productid).first()
+    if not product:
+        return Response({"error": "03: productid không tồn tại."}, status=status.HTTP_404_NOT_FOUND)
+
+    # Kiểm tra số lượng tồn kho
+    if product.quantity < number_of_items:
+        return Response({"error": "04: Số lượng trong kho của shop không đủ để bán."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Tạo đơn hàng
+    total_amount = product.price * number_of_items
+    order = Order.objects.create(
+        user=user,
+        total=total_amount,
+        status='Chờ xác nhận',
+        created_at=timezone.now(),
+        updated_at=timezone.now(),
+    )
+
+    # Tạo OrderItem
+    OrderItem.objects.create(
+        order=order,
+        product=product,
+        quantity=number_of_items,
+        price=total_amount
+    )
+
+    # Cập nhật số lượng tồn kho
+    product.quantity -= number_of_items
+    product.save()
+
+    # Trả về phản hồi thành công
+    return Response({"success": "01: Đơn hàng đã được tạo thành công."}, status=status.HTTP_201_CREATED)
 
 @api_view(['PUT'])
 def update_shipping_address(request, user_id):

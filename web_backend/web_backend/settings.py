@@ -26,9 +26,8 @@ SECRET_KEY = "django-insecure-+7t4hvz!@5#(_p)qk)7v4z^c!42=kky2sokrefs$&rv7=%9q6g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["172.20.222.211", "localhost", "127.0.0.1", "0.0.0.0", "192.168.1.12"]
-
-
+# ALLOWED_HOSTS = ["172.20.222.211", "localhost", "127.0.0.1", "0.0.0.0", "192.168.1.19", "928b-2001-ee0-4b49-7600-a921-ed54-15a1-9927.ngrok-free.app"]
+ALLOWED_HOSTS = ["*"]
 
 SITE_ID = 1
 # Application definition
@@ -45,6 +44,7 @@ INSTALLED_APPS = [
     # `sites` app cần trước các app liên quan đến allauth
     # Third-party apps
     'rest_framework',
+    'rest_framework_simplejwt',
     'rest_framework.authtoken',
     'dj_rest_auth',
     'dj_rest_auth.registration',
@@ -99,9 +99,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://172.20.222.211:3000",
-    "http://192.168.1.12:8000",
+    "http://172.20.222.211:3000",    
     "http://172.20.222.211:8000",
+    "http://192.168.1.19:8000"
 ]
 
 SESSION_COOKIE_DOMAIN = '127.0.0.1'  # Đảm bảo backend chỉ đặt cookie cho một domain
@@ -197,7 +197,19 @@ DATABASES = {
             'charset': 'utf8mb4',
     'init_command': "SET sql_mode='STRICT_TRANS_TABLES', innodb_strict_mode=1;",
         },
-    }
+    },
+    'backup': {
+        'ENGINE': 'django.db.backends.mysql',  # Cũng sử dụng MySQL
+        'NAME': 'cap1_backup',  # Tên database backup
+        'USER': 'root',  # User MySQL
+        'PASSWORD': '12345',  # Password MySQL
+        'HOST': 'localhost',
+        'PORT': '3306',
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', innodb_strict_mode=1;",
+        },
+    },
 }
 
 # Password validation
@@ -246,21 +258,28 @@ MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
 
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'USER_ID_FIELD': 'user_id',
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [        
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
         # 'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication',
+        'web_backend.authentication.CustomJWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
-        # 'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.JSONParser',
-        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
@@ -282,7 +301,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000",
     'http://127.0.0.1:8000/api/auth/registration/google/',
     "http://172.20.222.211:8000",
-    "http://192.168.1.12:8000",
+    "http://192.168.1.19:8000",
 ]
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = [
@@ -329,7 +348,11 @@ CELERY_BEAT_SCHEDULE = {
     # },
     'sync-user-behavior-every-hour': {
         'task': 'web_backend.tasks.sync_user_behavior',
-        'schedule': crontab(minute='5'), 
+        'schedule': crontab(minute='*/5'), 
+    },
+    'sync-database-every-hour': {
+        'task': 'web_backend.tasks.sync_to_backup',
+        'schedule': crontab(minute=0, hour='*'),  # Chạy mỗi giờ
     },
 }
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'

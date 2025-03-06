@@ -1,4 +1,4 @@
-from rest_framework.decorators import api_view, parser_classes 
+from rest_framework.decorators import api_view, parser_classes, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Count, Sum, F
@@ -29,16 +29,64 @@ from web_backend.middleware import cache_action
 from django.http import JsonResponse
 import json
 from web_backend.models import Product
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
+from django.contrib.auth.hashers import make_password, check_password
 CACHE_TIMEOUT = 60 * 15  # Cache timeout in seconds (15 minutes)
+class TokenObtainPairView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
 
+        print(f"Username: {username}, Password: {password}")  # Debug
 
+        try:
+            # Truy vấn trực tiếp User từ cơ sở dữ liệu
+            user = User.objects.get(username=username)
+            
+            # Kiểm tra mật khẩu
+            if check_password(password, user.password):
+                print("User authenticated successfully")  # Debug
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                }, status=status.HTTP_200_OK)
+            else:
+                print("Invalid password")  # Debug
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        except User.DoesNotExist:
+            print("User not found")  # Debug
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.decorators import authentication_classes, permission_classes
+from rest_framework.exceptions import AuthenticationFailed
+from web_backend.authentication import CustomJWTAuthentication
+
+@api_view(['GET'])
+# @authentication_classes([CustomJWTAuthentication])
+# @permission_classes([IsAuthenticated])
 def get_product(request):
-    if request.method == 'GET':
-        products = Product.objects.values('product_id', 'name', 'rating', 'price', 'description')[:10]
-        return JsonResponse(list(products), safe=False)
-    else:
-        return JsonResponse({'error': 'GET method required'}, status=405)
+    if not hasattr(request, 'user') or not request.user:
+        raise AuthenticationFailed('Bạn cần đăng nhập để truy cập tài nguyên này.')
+
+    products = Product.objects.prefetch_related('images').all()[:14]
+    data = []
+    for product in products:
+        data.append({
+            'product_id': product.product_id,
+            'name': product.name,
+            'rating': product.rating,
+            'price': product.price,
+            'description': product.description,
+            'images': [image.file for image in product.images.all()],
+        })
+    return Response(data)
 
 @api_view(['GET'])
 def get_random_relevant_products(request):

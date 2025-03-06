@@ -3,11 +3,12 @@ from .views import (filter_by_subcategory, get_product, product_detail, create_p
     get_featured_products, get_trending_products, get_random_products,
     get_popular_categories, get_all_categories, get_latest_comments,
     filter_by_category, filter_by_price, filter_by_color, filter_by_brand,
-    filter_by_stock_status, filter_page, search_products, get_categories_subcategory, get_top_subcategories, get_product_comments, get_random_relevant_products
+    filter_by_stock_status, filter_page, search_products, get_categories_subcategory, get_top_subcategories, get_product_comments, get_random_relevant_products, TokenObtainPairView
 )
 
 urlpatterns = [
     path('get_product/', get_product, name='get_product'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     
     # Product display APIs
     path('featured/', get_featured_products, name='featured_products'),

@@ -27,6 +27,7 @@ from django.http import JsonResponse
 import uuid
 import json
 
+
 def validate_email_format(value):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
     if not re.match(email_regex, value):
@@ -99,6 +100,63 @@ def verify_email(request):
         return Response({"error": "Invalid verification token."}, status=status.HTTP_404_NOT_FOUND)
 
 # Login User
+# @api_view(['POST'])
+# def login_view(request):
+#     if request.method == 'POST':
+#         serializer = LoginSerializer(data=request.data)
+#         if serializer.is_valid():
+#             username = serializer.validated_data.get('username')
+#             password = serializer.validated_data.get('password')
+#             # Lấy session_id từ cookie
+#             session_id = request.COOKIES.get('session_id') 
+#             print("SessionID 1", session_id)
+#             try:
+#                 user = User.objects.get(username=username)
+#                 if check_password(password, user.password):
+#                     token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
+#                     # Cập nhật user_id cho các hành vi liên quan đến session_id
+#                     if session_id:
+#                         UserBehavior.objects.filter(session_id=session_id).update(user_id=user.user_id)
+#                     user_serializer = LoginUserSerializer(user) 
+#                     # Tạo session_id mới nếu cần
+#                     session_id = session_id or str(uuid.uuid4())
+#                     print("SessionID 2", session_id)
+#                     response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)                                    
+#                     response.set_cookie(
+#                         'user_token',  # Cookie name
+#                         token,  # Token value
+#                         max_age=36000,  # Expiry time in seconds
+#                         httponly=False,  # Prevent JavaScript access
+#                         secure=True,  # Only send over HTTPS
+#                         samesite='None',  # SameSite security policy                        
+#                     )
+#                     response.set_cookie(
+#                         'user',  # Cookie name
+#                         json.dumps(user_serializer.data),  # Convert the user data to JSON
+#                         max_age=7 * 24 * 60 * 60,  # Expire in 7 days
+#                         httponly=False,  # Prevent JavaScript access
+#                         secure=True,  # Only send over HTTPS
+#                         samesite='None',)  # SameSite security policy)
+                  
+#                     # Set session_id vào cookie
+#                     response.set_cookie(
+#                         'session_id',  # Tên cookie cho session_id
+#                         session_id,  # Giá trị session_id
+#                         max_age=7 * 24 * 60 * 60,  # Thời gian tồn tại (7 ngày)
+#                         httponly=False,  # Prevent JavaScript access
+#                         secure=True,  # Only send over HTTPS
+#                         samesite='None',  # SameSite security policy)hính sách SameSite                        
+#                     )
+#                     print(response.cookies)
+#                     return response
+#                 else:
+#                     return Response({"message": "Invalid password"}, status=status.HTTP_401_UNAUTHORIZED)
+#             except User.DoesNotExist:
+#                 return Response({"message": "User does not exist"}, status=status.HTTP_404_NOT_FOUND)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework_simplejwt.tokens import RefreshToken
+from datetime import datetime, timedelta
 @api_view(['POST'])
 def login_view(request):
     if request.method == 'POST':
@@ -106,47 +164,45 @@ def login_view(request):
         if serializer.is_valid():
             username = serializer.validated_data.get('username')
             password = serializer.validated_data.get('password')
-            # Lấy session_id từ cookie
-            session_id = request.COOKIES.get('session_id') 
-            print("SessionID 1", session_id)
+            session_id = request.COOKIES.get('session_id')
+            
             try:
                 user = User.objects.get(username=username)
                 if check_password(password, user.password):
-                    token = jwt.encode({'user_id': user.user_id}, settings.JWT_SECRET_KEY, algorithm='HS256')
-                    # Cập nhật user_id cho các hành vi liên quan đến session_id
+                    # Tạo JWT Token
+                    token_payload = {
+                        'user_id': user.user_id,
+                        'username': user.username,
+                        'exp': datetime.utcnow() + timedelta(days=1),
+                        'iat': datetime.utcnow()
+                    }
+                    access_token = jwt.encode(
+                        token_payload,
+                        settings.SECRET_KEY,
+                        algorithm='HS256'
+                    )
+                    
                     if session_id:
                         UserBehavior.objects.filter(session_id=session_id).update(user_id=user.user_id)
-                    user_serializer = LoginUserSerializer(user) 
-                    # Tạo session_id mới nếu cần
+                    
+                    user_serializer = LoginUserSerializer(user)
                     session_id = session_id or str(uuid.uuid4())
-                    print("SessionID 2", session_id)
-                    response = Response({'message': 'Login successful', 'user': user_serializer.data, 'token': token }, status=status.HTTP_200_OK)                                    
+
+                    response = Response({
+                        'message': 'Login successful',
+                        'user': user_serializer.data,
+                        'token': access_token
+                    }, status=status.HTTP_200_OK)
+
                     response.set_cookie(
-                        'user_token',  # Cookie name
-                        token,  # Token value
-                        max_age=36000,  # Expiry time in seconds
-                        httponly=False,  # Prevent JavaScript access
-                        secure=True,  # Only send over HTTPS
-                        samesite='None',  # SameSite security policy                        
+                        'session_id',
+                        session_id,
+                        max_age=7 * 24 * 60 * 60,
+                        httponly=False,
+                        secure=True,
+                        samesite='None',
                     )
-                    response.set_cookie(
-                        'user',  # Cookie name
-                        json.dumps(user_serializer.data),  # Convert the user data to JSON
-                        max_age=7 * 24 * 60 * 60,  # Expire in 7 days
-                        httponly=False,  # Prevent JavaScript access
-                        secure=True,  # Only send over HTTPS
-                        samesite='None',)  # SameSite security policy)
-                  
-                    # Set session_id vào cookie
-                    response.set_cookie(
-                        'session_id',  # Tên cookie cho session_id
-                        session_id,  # Giá trị session_id
-                        max_age=7 * 24 * 60 * 60,  # Thời gian tồn tại (7 ngày)
-                        httponly=False,  # Prevent JavaScript access
-                        secure=True,  # Only send over HTTPS
-                        samesite='None',  # SameSite security policy)hính sách SameSite                        
-                    )
-                    print(response.cookies)
+
                     return response
                 else:
                     return Response({"message": "Invalid password"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -154,6 +210,7 @@ def login_view(request):
                 return Response({"message": "User does not exist"}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    
 # Logout User
 @api_view(['POST'])
 def logout_view(request, user_id):
